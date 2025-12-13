@@ -187,14 +187,14 @@ const Dashboard: React.FC = () => {
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                <table className="w-full text-left border-collapse border border-slate-200">
+                    <thead className="bg-slate-50 text-slate-600">
                         <tr>
-                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-16 text-center">序号</th>
-                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-56 text-center">项目ID</th>
-                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider min-w-[300px]">视频主题</th>
-                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-32 text-center">状态</th>
-                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-40 text-center hidden md:table-cell">创建日期</th>
+                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-16 text-center border-r border-slate-200">序号</th>
+                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-56 text-center border-r border-slate-200">项目ID</th>
+                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider min-w-[300px] border-r border-slate-200">视频主题</th>
+                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-32 text-center border-r border-slate-200">状态</th>
+                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-40 text-center hidden md:table-cell border-r border-slate-200">创建日期</th>
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-24 text-center">操作</th>
                         </tr>
                     </thead>
@@ -215,15 +215,15 @@ const Dashboard: React.FC = () => {
                                     onClick={() => navigate(`/project/${project.id}`)}
                                     className="group hover:bg-slate-50/80 transition-all cursor-pointer"
                                 >
-                                    <td className="py-4 px-4 text-center text-sm font-bold text-slate-400">
+                                    <td className="py-4 px-4 text-center text-sm font-bold text-slate-400 border-r border-slate-200">
                                         {index + 1}
                                     </td>
-                                    <td className="py-4 px-4 text-center">
+                                    <td className="py-4 px-4 text-center border-r border-slate-200">
                                         <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200 whitespace-nowrap">
                                             {serial}
                                         </span>
                                     </td>
-                                    <td className="py-4 px-4 max-w-[300px]">
+                                    <td className="py-4 px-4 max-w-[300px] border-r border-slate-200">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
                                                 <FolderOpen className="w-4 h-4" />
@@ -234,7 +234,7 @@ const Dashboard: React.FC = () => {
                                         </div>
                                     </td>
                                     
-                                    <td className="py-4 px-4 text-center align-middle relative h-full">
+                                    <td className="py-4 px-4 text-center align-middle relative h-full border-r border-slate-200">
                                         <div className="relative w-full h-full min-h-[40px] flex items-center justify-center">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset ${getStatusStyle(status)}`}>
                                                 {getStatusText(status)}
@@ -264,7 +264,7 @@ const Dashboard: React.FC = () => {
                                         </div>
                                     </td>
 
-                                    <td className="py-4 px-4 hidden md:table-cell text-center">
+                                    <td className="py-4 px-4 hidden md:table-cell text-center border-r border-slate-200">
                                         <div className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
                                             <Calendar className="w-3.5 h-3.5 text-slate-400" />
                                             {new Date(project.createdAt).toLocaleDateString('zh-CN')}
