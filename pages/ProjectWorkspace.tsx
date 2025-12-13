@@ -400,7 +400,23 @@ const ProjectWorkspace: React.FC = () => {
              const p = promptTemplate
                 .replace('{{title}}', project.title)
                 .replace('{{script}}', project.script || '');
-             const data = await gemini.generateJSON<CoverOption[]>(p);
+             
+             // Define schema to ensure correct structure
+             const schema = {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    visual: { type: "STRING" },
+                    titleTop: { type: "STRING" },
+                    titleBottom: { type: "STRING" },
+                    score: { type: "NUMBER" }
+                  },
+                  required: ["visual", "titleTop", "titleBottom"]
+                }
+             };
+
+             const data = await gemini.generateJSON<CoverOption[]>(p, schema);
              update = { coverOptions: data };
         }
 
@@ -748,16 +764,20 @@ const ProjectWorkspace: React.FC = () => {
                                     let displayTop = item.titleTop || item.copy || '';
                                     let displayBottom = item.titleBottom || '';
 
-                                    // Check for separators /, -, or space to split the main title
+                                    // Check for separators ｜, |, /, -, or space to split the main title
+                                    const separators = ['｜', '|', '/', '-', ' '];
                                     let splitIndex = -1;
                                     
-                                    if (displayTop.includes('/')) splitIndex = displayTop.indexOf('/');
-                                    else if (displayTop.includes('-')) splitIndex = displayTop.indexOf('-');
-                                    else if (displayTop.includes(' ')) splitIndex = displayTop.indexOf(' ');
+                                    for (const sep of separators) {
+                                        if (displayTop.includes(sep)) {
+                                            splitIndex = displayTop.indexOf(sep);
+                                            break;
+                                        }
+                                    }
 
                                     if (splitIndex !== -1) {
                                         const p1 = displayTop.substring(0, splitIndex).trim();
-                                        const p2 = displayTop.substring(splitIndex + 1).trim();
+                                        const p2 = displayTop.substring(splitIndex + 1).trim(); // +1 to skip separator
                                         // If split results in two non-empty parts, use them
                                         // This overrides existing bottom title if split happens
                                         if (p1 && p2) {
