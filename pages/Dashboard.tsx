@@ -191,7 +191,7 @@ const Dashboard: React.FC = () => {
                     <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                         <tr>
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-16 text-center">序号</th>
-                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-40 text-center">项目ID</th>
+                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-56 text-center">项目ID</th>
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider min-w-[300px]">视频主题</th>
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-32 text-center">状态</th>
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-40 text-center hidden md:table-cell">创建日期</th>
@@ -218,7 +218,7 @@ const Dashboard: React.FC = () => {
                                         {index + 1}
                                     </td>
                                     <td className="py-4 px-4 text-center">
-                                        <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200">
+                                        <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200 whitespace-nowrap">
                                             {serial}
                                         </span>
                                     </td>
