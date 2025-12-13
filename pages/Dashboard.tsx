@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProjectData, ProjectStatus } from '../types';
 import * as storage from '../services/storageService';
-import { Calendar, Trash2, Plus, Sparkles, Loader2, Cloud, CloudCheck, AlertCircle, FolderOpen, Video } from 'lucide-react';
+import { Calendar, Trash2, Plus, Sparkles, Loader2, Cloud, CloudCheck, AlertCircle, FolderOpen, Video, Archive } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -110,6 +110,25 @@ const Dashboard: React.FC = () => {
         setLastSyncTime(new Date().toLocaleTimeString());
     } catch(e) {
         setSyncStatus('error');
+    }
+  };
+
+  const handleArchive = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm('确定要归档此项目吗？归档后项目将移入归档仓库，仅供只读浏览。')) {
+        await storage.archiveProject(id);
+        // Remove locally from display list
+        setProjects(prev => prev.filter(p => p.id !== id));
+        // Trigger Sync
+        setSyncStatus('saving');
+        try {
+            await storage.uploadProjects();
+            setSyncStatus('synced');
+            setLastSyncTime(new Date().toLocaleTimeString());
+        } catch(e) {
+            setSyncStatus('error');
+        }
     }
   };
 
@@ -271,23 +290,33 @@ const Dashboard: React.FC = () => {
                                         </div>
                                     </td>
                                     <td className="py-4 px-4 text-center">
-                                        {deleteConfirmId === project.id ? (
+                                        <div className="flex items-center justify-center gap-2">
                                             <button 
-                                                onClick={(e) => handleDelete(e, project.id)}
-                                                className="text-xs bg-rose-50 text-rose-600 border border-rose-200 px-2 py-1.5 rounded font-bold hover:bg-rose-100 transition-colors whitespace-nowrap"
-                                                onMouseLeave={() => setDeleteConfirmId(null)}
+                                                onClick={(e) => handleArchive(e, project.id)}
+                                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                title="归档项目"
                                             >
-                                                确认删除?
+                                                <Archive className="w-4 h-4" />
                                             </button>
-                                        ) : (
-                                            <button 
-                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteConfirmId(project.id); }}
-                                                className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                                                title="删除"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        )}
+
+                                            {deleteConfirmId === project.id ? (
+                                                <button 
+                                                    onClick={(e) => handleDelete(e, project.id)}
+                                                    className="text-xs bg-rose-50 text-rose-600 border border-rose-200 px-2 py-1.5 rounded font-bold hover:bg-rose-100 transition-colors whitespace-nowrap"
+                                                    onMouseLeave={() => setDeleteConfirmId(null)}
+                                                >
+                                                    确认删除?
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteConfirmId(project.id); }}
+                                                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
+                                                    title="删除"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             );
