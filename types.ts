@@ -59,6 +59,7 @@ export interface ProjectData {
     title: string;
     prompt: string;
   };
+  audioFile?: string; // URL to uploaded audio file
 }
 
 export interface Inspiration {
