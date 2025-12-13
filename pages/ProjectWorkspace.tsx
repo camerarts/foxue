@@ -414,23 +414,31 @@ const ProjectWorkspace: React.FC = () => {
                      const isActive = selectedNodeId === node.id;
                      const isGenerating = generatingNodes.has(node.id);
                      let hasData = false;
+                     
+                     if (node.id === 'input') hasData = !!project.title;
+                     if (node.id === 'script') hasData = !!project.script;
+                     if (node.id === 'titles') hasData = !!project.titles && project.titles.length > 0;
                      if (node.id === 'audio_file') hasData = !!project.audioFile || !!pendingAudio;
+                     if (node.id === 'summary') hasData = !!project.summary;
+                     if (node.id === 'cover') hasData = !!project.coverOptions && project.coverOptions.length > 0;
 
                      return (
                          <div 
                             key={node.id}
                             style={{ left: node.x, top: node.y, width: NODE_WIDTH, height: NODE_HEIGHT }}
-                            className={`absolute bg-white rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden group hover:shadow-md ${
+                            className={`absolute rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden group hover:shadow-md ${
                                 isActive 
                                 ? `ring-2 ring-offset-2 ring-${node.color}-400 border-${node.color}-200` 
-                                : 'border-slate-200 hover:border-slate-300'
+                                : hasData
+                                    ? 'bg-emerald-50/80 border-emerald-200'
+                                    : 'bg-white border-slate-200 hover:border-slate-300'
                             }`}
                             onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}
                          >
                              {/* Header */}
-                             <div className={`h-12 w-full border-b border-slate-100 flex items-center px-4 justify-between bg-gradient-to-r from-white to-slate-50`}>
+                             <div className={`h-12 w-full border-b flex items-center px-4 justify-between bg-gradient-to-r ${hasData ? 'from-emerald-50 to-white border-emerald-100' : 'from-white to-slate-50 border-slate-100'}`}>
                                  <div className="flex items-center gap-2 font-bold text-slate-700">
-                                     <node.icon className={`w-5 h-5 text-${node.color}-500`} />
+                                     <node.icon className={`w-5 h-5 ${hasData ? 'text-emerald-500' : `text-${node.color}-500`}`} />
                                      {node.label}
                                  </div>
                                  {isActive && <div className={`w-2 h-2 rounded-full bg-${node.color}-500 animate-pulse`}></div>}
@@ -442,7 +450,7 @@ const ProjectWorkspace: React.FC = () => {
                                 <div className="flex justify-end mt-auto">
                                     <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
                                         hasData 
-                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                                        ? 'bg-emerald-100 text-emerald-600 border-emerald-200' 
                                         : 'bg-slate-50 text-slate-400 border-slate-100'
                                     }`}>
                                         {isGenerating ? '处理中...' : hasData ? '已完成' : '待处理'}
