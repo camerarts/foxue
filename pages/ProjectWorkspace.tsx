@@ -341,7 +341,6 @@ const ProjectWorkspace: React.FC = () => {
   
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [generatingNodes, setGeneratingNodes] = useState<Set<string>>(new Set());
-  const [failedNodes, setFailedNodes] = useState<Set<string>>(new Set());
   const [prompts, setPrompts] = useState<Record<string, PromptTemplate>>({});
   
   // Audio Upload State
@@ -358,8 +357,49 @@ const ProjectWorkspace: React.FC = () => {
 
   // Sync Status
   const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'synced' | 'error' | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState('');
   
-  const mountedRef = useRef(true);
+  // Activity Tracking Refs
+  const lastActivityRef = useRef(Date.now());
+  const isBusyRef = useRef(false);
+
+  // Update busy ref based on state
+  useEffect(() => {
+      isBusyRef.current = loading || generatingNodes.size > 0 || isUploading;
+  }, [loading, generatingNodes, isUploading]);
+
+  useEffect(() => {
+    const updateActivity = () => { lastActivityRef.current = Date.now(); };
+    window.addEventListener('click', updateActivity);
+    window.addEventListener('keydown', updateActivity);
+    return () => {
+        window.removeEventListener('click', updateActivity);
+        window.removeEventListener('keydown', updateActivity);
+    };
+  }, []);
+
+  // Auto Sync Loop
+  useEffect(() => {
+      let timeoutId: ReturnType<typeof setTimeout>;
+      const performSync = async () => {
+          const isUserActive = (Date.now() - lastActivityRef.current) < 30000;
+          if (isBusyRef.current || isUserActive) {
+              timeoutId = setTimeout(performSync, 2 * 60 * 1000);
+              return;
+          }
+          setSyncStatus('saving');
+          try {
+              await storage.uploadProjects();
+              setSyncStatus('synced');
+              setLastSyncTime(new Date().toLocaleTimeString());
+          } catch (e) {
+              setSyncStatus('error');
+          }
+          timeoutId = setTimeout(performSync, 5 * 60 * 1000);
+      };
+      timeoutId = setTimeout(performSync, 5 * 60 * 1000);
+      return () => clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -374,11 +414,20 @@ const ProjectWorkspace: React.FC = () => {
     init();
   }, [id]);
 
+  const triggerBackgroundSync = () => {
+       setSyncStatus('saving');
+       storage.uploadProjects().then(() => {
+           setSyncStatus('synced');
+           setLastSyncTime(new Date().toLocaleTimeString());
+       }).catch(() => setSyncStatus('error'));
+  };
+
   const updateProjectField = async (field: keyof ProjectData, value: any) => {
     if (!project) return;
     const updated = { ...project, [field]: value };
     setProject(updated);
     await storage.saveProject(updated);
+    triggerBackgroundSync();
   };
 
   const handleAudioFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -400,6 +449,7 @@ const ProjectWorkspace: React.FC = () => {
           setProject(updated);
           await storage.saveProject(updated);
           setPendingAudio(null);
+          triggerBackgroundSync();
       } catch(e) { alert('上传失败'); }
       setIsUploading(false);
   };
@@ -480,6 +530,7 @@ const ProjectWorkspace: React.FC = () => {
         const newProject = { ...project, ...update };
         setProject(newProject);
         await storage.saveProject(newProject);
+        triggerBackgroundSync();
         
     } catch (e: any) {
         console.error(e);
@@ -529,15 +580,40 @@ const ProjectWorkspace: React.FC = () => {
         {/* Hidden Audio Input for Trigger */}
         <input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileSelect} />
 
-        {/* Top Left Project Title */}
-        <div className="absolute top-6 left-6 z-20 pointer-events-none select-none">
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight opacity-50">
+        {/* Top Left Project Title with Back Button */}
+        <div className="absolute top-6 left-6 z-20 flex items-center gap-3">
+             <button 
+                onClick={() => navigate('/dashboard')} 
+                className="p-2 bg-white/50 hover:bg-white rounded-full shadow-sm backdrop-blur-sm transition-all border border-slate-200/50 hover:border-slate-300 group"
+                title="返回仪表盘"
+             >
+                 <ArrowLeft className="w-5 h-5 text-slate-500 group-hover:text-slate-800" />
+             </button>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight opacity-50 select-none pointer-events-none">
                 {project.title || '未命名项目'}
             </h1>
         </div>
 
-        {/* Top Right "One Click" Button */}
-        <div className="absolute top-4 right-4 z-20">
+        {/* Top Right "One Click" Button and Sync Status */}
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
+            {/* Sync Badge */}
+            <div className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border shadow-sm backdrop-blur-sm transition-colors ${
+                syncStatus === 'synced' ? 'bg-emerald-50/90 text-emerald-600 border-emerald-100' :
+                syncStatus === 'saving' ? 'bg-blue-50/90 text-blue-600 border-blue-100' :
+                syncStatus === 'error' ? 'bg-rose-50/90 text-rose-600 border-rose-100' :
+                'bg-slate-50/90 text-slate-400 border-slate-100'
+            }`}>
+                {syncStatus === 'synced' ? <CloudCheck className="w-3.5 h-3.5" /> : 
+                 syncStatus === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 
+                 syncStatus === 'error' ? <AlertCircle className="w-3.5 h-3.5" /> :
+                 <Cloud className="w-3.5 h-3.5" />}
+                
+                {syncStatus === 'synced' ? `已同步云端: ${lastSyncTime}` :
+                 syncStatus === 'saving' ? '正在同步...' :
+                 syncStatus === 'error' ? '同步失败' :
+                 '准备就绪'}
+            </div>
+
             <button
                 onClick={handleOneClickStart}
                 disabled={generatingNodes.size > 0}
