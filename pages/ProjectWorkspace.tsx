@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
@@ -28,7 +30,7 @@ const RowCopyButton = ({ text }: { text: string }) => {
   );
 };
 
-// --- Fancy Audio Player Component ---
+// --- Fancy Audio Player Component (Light Theme) ---
 const FancyAudioPlayer = ({ 
     src, 
     fileName, 
@@ -110,26 +112,25 @@ const FancyAudioPlayer = ({
     };
 
     return (
-        <div className="w-full bg-slate-900 rounded-3xl overflow-hidden shadow-2xl relative group">
-            {/* Background Gradient & Effects */}
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-900/40 via-fuchsia-900/20 to-slate-900 z-0"></div>
-            <div className={`absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-[radial-gradient(circle,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] z-0 opacity-50 ${isPlaying ? 'animate-[spin_60s_linear_infinite]' : ''}`}></div>
+        <div className="w-full bg-white rounded-3xl overflow-hidden shadow-xl shadow-slate-200/50 border border-slate-100 relative group">
+            {/* Soft Gradient Background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-50/50 via-white to-violet-50/50 z-0"></div>
 
             <div className="relative z-10 p-6 flex flex-col items-center">
                 
                 {/* Visualizer & Icon */}
-                <div className="w-full h-32 flex items-center justify-center gap-1.5 mb-6 relative">
+                <div className="w-full h-32 flex items-center justify-center gap-1.5 mb-4 relative">
                      {/* Center Icon */}
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-500 z-20 ${isPlaying ? 'bg-fuchsia-500 shadow-fuchsia-500/50 scale-110' : 'bg-slate-800 shadow-slate-900/50'}`}>
-                        <Music className={`w-8 h-8 ${isPlaying ? 'text-white animate-bounce' : 'text-slate-500'}`} />
+                    <div className={`w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-500 z-20 ${isPlaying ? 'bg-gradient-to-br from-fuchsia-500 to-violet-600 shadow-fuchsia-500/30 scale-105' : 'bg-white border border-slate-100 shadow-sm'}`}>
+                        <Music className={`w-8 h-8 ${isPlaying ? 'text-white animate-bounce' : 'text-slate-300'}`} />
                     </div>
 
                     {/* Animated Bars (Fake Visualizer) */}
-                    <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-60">
+                    <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-40">
                          {[...Array(20)].map((_, i) => (
                              <div 
                                 key={i} 
-                                className={`w-1.5 bg-gradient-to-t from-violet-500 to-fuchsia-400 rounded-full transition-all duration-150 ${isPlaying ? 'animate-pulse' : 'h-2'}`}
+                                className={`w-1.5 bg-gradient-to-t from-violet-400 to-fuchsia-300 rounded-full transition-all duration-150 ${isPlaying ? 'animate-pulse' : 'h-2'}`}
                                 style={{ 
                                     height: isPlaying ? `${Math.random() * 80 + 10}%` : '10%',
                                     animationDelay: `${i * 0.05}s`
@@ -140,31 +141,31 @@ const FancyAudioPlayer = ({
                 </div>
 
                 {/* File Info */}
-                <div className="text-center mb-6 w-full">
-                    <h3 className="text-white font-bold text-lg truncate px-4">{fileName}</h3>
+                <div className="text-center mb-6 w-full px-2">
+                    <h3 className="text-slate-800 font-bold text-lg truncate">{fileName}</h3>
                     <div className="flex items-center justify-center gap-2 mt-2">
                         {isLocal ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full border border-amber-500/30">
+                            <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full border border-amber-100">
                                 待上传
                             </span>
                         ) : (
-                             <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full border border-emerald-500/30 flex items-center gap-1">
+                             <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" /> 云端已同步
                             </span>
                         )}
-                        <span className="text-[10px] text-slate-400 font-mono">{formatTime(duration)}</span>
+                        <span className="text-[10px] text-slate-400 font-mono bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">{formatTime(duration)}</span>
                     </div>
                 </div>
 
                 {/* Controls Area */}
-                <div className="w-full bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                <div className="w-full bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
                     <audio ref={audioRef} src={src} preload="metadata" />
                     
                     {/* Progress Bar */}
                     <div className="flex items-center gap-3 mb-4">
                         <span className="text-[10px] font-mono text-slate-400 w-8 text-right">{formatTime(currentTime)}</span>
                         <div className="relative flex-1 h-1.5 group/seek">
-                             <div className="absolute inset-0 bg-slate-700 rounded-full"></div>
+                             <div className="absolute inset-0 bg-slate-200 rounded-full"></div>
                              <div 
                                 className="absolute top-0 left-0 h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full transition-all duration-100"
                                 style={{ width: `${progress}%` }}
@@ -178,7 +179,7 @@ const FancyAudioPlayer = ({
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                              />
                              <div 
-                                className="absolute top-1/2 -mt-1.5 h-3 w-3 bg-white rounded-full shadow-lg opacity-0 group-hover/seek:opacity-100 transition-opacity pointer-events-none"
+                                className="absolute top-1/2 -mt-1.5 h-3 w-3 bg-white border border-slate-200 rounded-full shadow-md opacity-0 group-hover/seek:opacity-100 transition-opacity pointer-events-none"
                                 style={{ left: `${progress}%`, marginLeft: '-6px' }}
                              ></div>
                         </div>
@@ -187,14 +188,14 @@ const FancyAudioPlayer = ({
 
                     {/* Main Buttons */}
                     <div className="flex items-center justify-between">
-                         <button onClick={toggleMute} className="text-slate-400 hover:text-white transition-colors p-2">
+                         <button onClick={toggleMute} className="text-slate-400 hover:text-slate-800 transition-colors p-2">
                              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
                          </button>
 
                          <div className="flex items-center gap-4">
                              <button 
                                 onClick={togglePlay}
-                                className="w-12 h-12 bg-white text-slate-900 rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-white/10"
+                                className="w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-slate-900/20"
                              >
                                  {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
                              </button>
@@ -202,7 +203,7 @@ const FancyAudioPlayer = ({
 
                          {/* Actions Menu */}
                          <div className="flex gap-2">
-                             <button onClick={onReplace} className="text-slate-400 hover:text-white p-2" title="替换">
+                             <button onClick={onReplace} className="text-slate-400 hover:text-slate-800 p-2" title="替换">
                                  <RefreshCw className="w-4 h-4" />
                              </button>
                              {onDelete && (
@@ -216,16 +217,16 @@ const FancyAudioPlayer = ({
 
                 {/* Upload Status / Button */}
                 {isLocal && (
-                    <div className="w-full mt-4">
+                    <div className="w-full mt-4 animate-in fade-in slide-in-from-top-2">
                         {isUploading ? (
-                             <div className="w-full">
-                                <div className="flex justify-between text-[10px] font-bold text-fuchsia-300 mb-1">
-                                    <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin"/> 上传中...</span>
+                             <div className="w-full bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                <div className="flex justify-between text-[10px] font-bold text-slate-600 mb-1">
+                                    <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin text-fuchsia-600"/> 上传中...</span>
                                     <span>{Math.round(uploadProgress || 0)}%</span>
                                 </div>
-                                <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
                                     <div 
-                                        className="h-full bg-fuchsia-500 transition-all duration-300" 
+                                        className="h-full bg-gradient-to-r from-fuchsia-500 to-violet-500 transition-all duration-300" 
                                         style={{ width: `${uploadProgress || 0}%` }}
                                     />
                                 </div>
@@ -233,7 +234,7 @@ const FancyAudioPlayer = ({
                         ) : (
                              <button 
                                 onClick={onUpload}
-                                className="w-full py-3 bg-gradient-to-r from-fuchsia-600 to-violet-600 hover:from-fuchsia-500 hover:to-violet-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-fuchsia-900/20 transition-all flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                                className="w-full py-3 bg-gradient-to-r from-fuchsia-600 to-violet-600 hover:from-fuchsia-500 hover:to-violet-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-fuchsia-500/30 transition-all flex items-center justify-center gap-2 hover:-translate-y-0.5"
                             >
                                 <CloudUpload className="w-4 h-4" /> 上传到云端
                             </button>
