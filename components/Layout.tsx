@@ -221,7 +221,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             }`}
           >
             <LayoutDashboard className="w-5 h-5" />
-            <span className="text-[10px] font-medium">首页</span>
+            <span className="text-[10px] font-medium">项目列表</span>
           </Link>
           
           <Link
