@@ -438,6 +438,13 @@ const ProjectWorkspace: React.FC = () => {
         {/* Hidden Audio Input for Trigger */}
         <input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileSelect} />
 
+        {/* Top Left Project Title */}
+        <div className="absolute top-6 left-6 z-20 pointer-events-none select-none">
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight opacity-50">
+                {project.title || '未命名项目'}
+            </h1>
+        </div>
+
         {/* Top Right "One Click" Button */}
         <div className="absolute top-4 right-4 z-20">
             <button
