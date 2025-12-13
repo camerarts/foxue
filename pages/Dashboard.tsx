@@ -9,6 +9,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
   // Sync Status State
   const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'synced' | 'error' | null>(null);
@@ -143,20 +144,21 @@ const Dashboard: React.FC = () => {
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation(); // Stop row click
-    if (window.confirm('确定要删除这个项目吗？')) {
-      await storage.deleteProject(id);
-      setProjects(prev => prev.filter(p => p.id !== id));
+    
+    // Perform delete immediately (confirmation handled by UI state)
+    await storage.deleteProject(id);
+    setProjects(prev => prev.filter(p => p.id !== id));
+    setDeleteConfirmId(null);
 
-      // Auto-upload changes
-      setSyncStatus('saving');
-      try {
-          await storage.uploadProjects();
-          setSyncStatus('synced');
-          setLastSyncTime(new Date().toLocaleTimeString());
-      } catch(e) {
-          console.error(e);
-          setSyncStatus('error');
-      }
+    // Auto-upload changes
+    setSyncStatus('saving');
+    try {
+        await storage.uploadProjects();
+        setSyncStatus('synced');
+        setLastSyncTime(new Date().toLocaleTimeString());
+    } catch(e) {
+        console.error(e);
+        setSyncStatus('error');
     }
   };
 
@@ -292,13 +294,23 @@ const Dashboard: React.FC = () => {
                                         </div>
                                     </td>
                                     <td className="py-2.5 px-3 text-center border border-slate-200 align-middle">
-                                        <button 
-                                            onClick={(e) => handleDelete(e, project.id)}
-                                            className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-all"
-                                            title="删除项目"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        {deleteConfirmId === project.id ? (
+                                            <button 
+                                                onClick={(e) => handleDelete(e, project.id)}
+                                                className="text-xs bg-rose-50 text-rose-600 border border-rose-200 px-2 py-1.5 rounded-lg font-bold hover:bg-rose-100 transition-colors whitespace-nowrap animate-in fade-in zoom-in duration-200"
+                                                onMouseLeave={() => setDeleteConfirmId(null)}
+                                            >
+                                                确认删除?
+                                            </button>
+                                        ) : (
+                                            <button 
+                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteConfirmId(project.id); }}
+                                                className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-all"
+                                                title="删除项目"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             );
@@ -313,3 +325,4 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+
