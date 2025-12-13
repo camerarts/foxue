@@ -225,42 +225,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Link>
           
           <Link
-            to="/images"
-            className={`flex flex-col items-center justify-center py-2 w-full rounded-xl transition-all gap-1 ${
-              isActive('/images') 
-                ? 'bg-fuchsia-50 text-fuchsia-600' 
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <ImageIcon className="w-5 h-5" />
-            <span className="text-[10px] font-medium">生图</span>
-          </Link>
-
-          <Link
-            to="/inspiration"
-            className={`flex flex-col items-center justify-center py-2 w-full rounded-xl transition-all gap-1 ${
-              isActive('/inspiration') 
-                ? 'bg-amber-50 text-amber-600' 
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Lightbulb className="w-5 h-5" />
-            <span className="text-[10px] font-medium">灵感</span>
-          </Link>
-
-          <Link
-            to="/ai-titles"
-            className={`flex flex-col items-center justify-center py-2 w-full rounded-xl transition-all gap-1 ${
-              isActive('/ai-titles') 
-                ? 'bg-indigo-50 text-indigo-600' 
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Type className="w-5 h-5" />
-            <span className="text-[10px] font-medium">标题</span>
-          </Link>
-          
-          <Link
             to="/archive"
             className={`flex flex-col items-center justify-center py-2 w-full rounded-xl transition-all gap-1 ${
               isActive('/archive') 
