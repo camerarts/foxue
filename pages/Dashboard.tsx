@@ -203,6 +203,7 @@ const Dashboard: React.FC = () => {
                             const status = getEffectiveStatus(project);
                             const serial = serialMap.get(project.id) || '-';
 
+                            // Completion Status Checks
                             const hasTitles = project.titles && project.titles.length > 0;
                             const hasAudio = !!project.audioFile;
                             const hasSummary = !!project.summary && project.summary.length > 0;
@@ -233,16 +234,33 @@ const Dashboard: React.FC = () => {
                                         </div>
                                     </td>
                                     
-                                    <td className="py-4 px-4 text-center align-middle relative">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset ${getStatusStyle(status)}`}>
-                                            {getStatusText(status)}
-                                        </span>
-                                        
-                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full pointer-events-none flex justify-between px-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                             <div title="标题" className={`w-2 h-2 rounded-full border border-white shadow-sm mt-2 ${hasTitles ? 'bg-emerald-500' : 'bg-slate-200'}`} />
-                                             <div title="音频" className={`w-2 h-2 rounded-full border border-white shadow-sm mt-2 ${hasAudio ? 'bg-emerald-500' : 'bg-slate-200'}`} />
-                                             <div title="简介" className={`w-2 h-2 rounded-full border border-white shadow-sm mt-8 ${hasSummary ? 'bg-emerald-500' : 'bg-slate-200'}`} />
-                                             <div title="封面" className={`w-2 h-2 rounded-full border border-white shadow-sm mt-8 ${hasCover ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                                    <td className="py-4 px-4 text-center align-middle relative h-full">
+                                        <div className="relative w-full h-full min-h-[40px] flex items-center justify-center">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset ${getStatusStyle(status)}`}>
+                                                {getStatusText(status)}
+                                            </span>
+                                            
+                                            {/* Corner Dots - Persistent Display */}
+                                            {/* Top Left: Titles */}
+                                            <div 
+                                                title={`爆款标题: ${hasTitles ? '已完成' : '未完成'}`}
+                                                className={`absolute top-0 left-0 w-2 h-2 rounded-full border border-white shadow-sm transition-colors ${hasTitles ? 'bg-emerald-500' : 'bg-rose-400'}`} 
+                                            />
+                                            {/* Top Right: Audio */}
+                                            <div 
+                                                title={`音频文件: ${hasAudio ? '已上传' : '未上传'}`}
+                                                className={`absolute top-0 right-0 w-2 h-2 rounded-full border border-white shadow-sm transition-colors ${hasAudio ? 'bg-emerald-500' : 'bg-rose-400'}`} 
+                                            />
+                                            {/* Bottom Left: Summary */}
+                                            <div 
+                                                title={`简介标签: ${hasSummary ? '已生成' : '未生成'}`}
+                                                className={`absolute bottom-0 left-0 w-2 h-2 rounded-full border border-white shadow-sm transition-colors ${hasSummary ? 'bg-emerald-500' : 'bg-rose-400'}`} 
+                                            />
+                                            {/* Bottom Right: Cover */}
+                                            <div 
+                                                title={`封面策划: ${hasCover ? '已完成' : '未完成'}`}
+                                                className={`absolute bottom-0 right-0 w-2 h-2 rounded-full border border-white shadow-sm transition-colors ${hasCover ? 'bg-emerald-500' : 'bg-rose-400'}`} 
+                                            />
                                         </div>
                                     </td>
 
