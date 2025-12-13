@@ -620,7 +620,7 @@ const ProjectWorkspace: React.FC = () => {
           setPendingAudio(null);
           
           setSyncStatus('synced');
-          alert('音频文件上传成功！');
+          // alert('音频文件上传成功！'); // Removed alert per user request
       } catch(err: any) {
           console.error(err);
           alert(`音频上传失败: ${err.message || '未知错误'}`);
