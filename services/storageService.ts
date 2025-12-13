@@ -306,11 +306,18 @@ export const uploadFile = async (file: File, projectId?: string): Promise<string
   if (!res.ok) {
     let errMessage = `Upload failed (${res.status})`;
     try {
-        const errorData = await res.json();
-        if (errorData.error) errMessage += `: ${errorData.error}`;
-    } catch {
+        // Read response text ONCE to avoid "body stream already read" error
         const text = await res.text();
-        if (text) errMessage += `: ${text.substring(0, 100)}`;
+        try {
+            const errorData = JSON.parse(text);
+            if (errorData.error) errMessage += `: ${errorData.error}`;
+            else if (text) errMessage += `: ${text.substring(0, 100)}`;
+        } catch {
+            // If not JSON, append text snippet
+            if (text) errMessage += `: ${text.substring(0, 100)}`;
+        }
+    } catch (e) {
+        console.warn("Failed to read error response body", e);
     }
     throw new Error(errMessage);
   }
@@ -345,7 +352,18 @@ export const uploadImage = async (base64: string, projectId?: string): Promise<s
   });
 
   if (!res.ok) {
-    throw new Error('Image upload failed');
+    let errMessage = `Image upload failed (${res.status})`;
+    try {
+        const text = await res.text();
+        try {
+             const json = JSON.parse(text);
+             if (json.error) errMessage += `: ${json.error}`;
+             else if (text) errMessage += `: ${text.substring(0, 100)}`;
+        } catch {
+             if (text) errMessage += `: ${text.substring(0, 100)}`;
+        }
+    } catch { }
+    throw new Error(errMessage);
   }
   
   const data = await res.json();
@@ -599,3 +617,4 @@ export const getToolData = async <T>(id: string): Promise<T | null> => {
         return null;
     }
 };
+
