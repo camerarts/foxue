@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
@@ -9,7 +8,7 @@ import {
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play, Pause,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Music, Disc, Rewind, FastForward
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX
 } from 'lucide-react';
 
 const RowCopyButton = ({ text }: { text: string }) => {
@@ -21,13 +20,13 @@ const RowCopyButton = ({ text }: { text: string }) => {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button onClick={handleCopy} className="p-1.5 text-slate-400 hover:text-cyan-600 transition-colors" title="复制">
+    <button onClick={handleCopy} className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors" title="复制">
       {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
     </button>
   );
 };
 
-// --- Y2K / Winamp Style Audio Player ---
+// --- Clean Modern Audio Player ---
 const FancyAudioPlayer = ({ 
     src, 
     fileName, 
@@ -52,7 +51,6 @@ const FancyAudioPlayer = ({
     const [progress, setProgress] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-    const [isMuted, setIsMuted] = useState(false);
 
     useEffect(() => {
         const audio = audioRef.current;
@@ -95,98 +93,84 @@ const FancyAudioPlayer = ({
     };
 
     return (
-        <div className="w-full bg-gradient-to-b from-[#C0C0C0] to-[#808080] rounded-t-lg rounded-b-xl border-2 border-white border-b-[#404040] border-r-[#404040] shadow-[4px_4px_10px_rgba(0,0,0,0.3)] p-1.5 relative select-none">
-            {/* Title Bar */}
-            <div className="bg-gradient-to-r from-[#000080] to-[#1084d0] h-5 mb-1.5 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing border border-[#808080] border-b-white border-r-white">
-                <span className="text-[10px] text-white font-bold font-sans tracking-wide">WINAMP PLAYER</span>
-                <div className="flex gap-0.5">
-                     <div className="w-2.5 h-2.5 bg-[#C0C0C0] border border-white border-b-[#404040] border-r-[#404040] flex items-center justify-center text-[8px] font-bold text-black leading-none cursor-pointer">_</div>
-                     <div className="w-2.5 h-2.5 bg-[#C0C0C0] border border-white border-b-[#404040] border-r-[#404040] flex items-center justify-center text-[8px] font-bold text-black leading-none cursor-pointer">X</div>
-                </div>
-            </div>
-
-            {/* Display Screen */}
-            <div className="bg-black border-2 border-[#404040] border-b-white border-r-white p-2 mb-2 relative overflow-hidden h-16 flex items-center cyber-display">
-                <div className="flex-1">
-                     <div className="text-[#00FF00] font-mono text-xs truncate mb-1">
-                        {isPlaying ? `>>> ${fileName.toUpperCase()} <<<` : `${fileName.toUpperCase()}`}
+        <div className="w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+             <div className="flex items-center gap-3 mb-3">
+                 <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
+                     <FileAudio className="w-5 h-5 text-slate-500" />
+                 </div>
+                 <div className="flex-1 min-w-0">
+                     <h4 className="text-sm font-bold text-slate-800 truncate" title={fileName}>{fileName}</h4>
+                     <div className="flex items-center gap-2">
+                        {isLocal ? (
+                            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">待上传</span>
+                        ) : (
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">云端文件</span>
+                        )}
+                        <span className="text-xs text-slate-400 font-mono">{formatTime(currentTime)} / {formatTime(duration)}</span>
                      </div>
-                     <div className="flex justify-between items-end">
-                        <span className="text-[#00FF00] font-mono text-xl font-bold">{formatTime(currentTime)}</span>
-                        <div className="flex gap-1">
-                             <span className={`text-[9px] px-1 ${isLocal ? 'bg-amber-500 text-black' : 'bg-green-500 text-black'} font-bold`}>
-                                {isLocal ? 'LOCAL' : 'CLOUD'}
-                             </span>
-                             <span className="text-[9px] bg-red-500 text-black px-1 font-bold">128KBPS</span>
-                        </div>
-                     </div>
-                </div>
-            </div>
+                 </div>
+             </div>
 
-            <audio ref={audioRef} src={src} preload="metadata" />
+             <audio ref={audioRef} src={src} preload="metadata" />
 
-            {/* Seek Bar */}
-            <div className="relative w-full h-3 bg-[#000] border border-[#808080] border-b-white border-r-white mb-2 cursor-pointer group">
-                 <div 
-                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-600 via-yellow-500 to-red-600 opacity-60" 
-                    style={{ width: `${progress}%` }}
-                />
-                 <input 
-                    type="range" 
-                    min="0" 
-                    max="100" 
-                    value={progress} 
-                    onChange={handleSeek}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
-            </div>
+             {/* Progress Bar */}
+             <div className="relative w-full h-1.5 bg-slate-100 rounded-full mb-4 cursor-pointer group">
+                  <div 
+                     className="absolute top-0 left-0 h-full bg-slate-800 rounded-full transition-all" 
+                     style={{ width: `${progress}%` }}
+                 />
+                  <input 
+                     type="range" 
+                     min="0" 
+                     max="100" 
+                     value={progress} 
+                     onChange={handleSeek}
+                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                 />
+             </div>
 
-            {/* Controls */}
-            <div className="flex items-center justify-between">
-                <div className="flex gap-1">
-                    <button className="w-6 h-6 bg-[#C0C0C0] border-2 border-white border-b-[#404040] border-r-[#404040] active:border-[#404040] active:border-b-white active:border-r-white flex items-center justify-center">
-                        <Rewind className="w-3 h-3 text-black fill-current" />
-                    </button>
-                    <button 
-                        onClick={togglePlay}
-                        className="w-7 h-7 bg-[#C0C0C0] border-2 border-white border-b-[#404040] border-r-[#404040] active:border-[#404040] active:border-b-white active:border-r-white flex items-center justify-center"
-                    >
-                        {isPlaying ? <Pause className="w-3.5 h-3.5 text-black fill-current" /> : <Play className="w-3.5 h-3.5 text-black fill-current" />}
-                    </button>
-                    <button className="w-6 h-6 bg-[#C0C0C0] border-2 border-white border-b-[#404040] border-r-[#404040] active:border-[#404040] active:border-b-white active:border-r-white flex items-center justify-center">
-                        <FastForward className="w-3 h-3 text-black fill-current" />
-                    </button>
-                </div>
+             <div className="flex items-center justify-between">
+                 <div className="flex gap-2">
+                     <button 
+                         onClick={togglePlay}
+                         className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-700 transition-colors shadow-sm"
+                     >
+                         {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
+                     </button>
+                 </div>
 
-                <div className="flex gap-1">
-                    <button onClick={onReplace} className="w-6 h-6 bg-[#C0C0C0] border-2 border-white border-b-[#404040] border-r-[#404040] active:border-[#404040] active:border-b-white active:border-r-white flex items-center justify-center" title="Load">
-                        <RefreshCw className="w-3 h-3 text-black" />
-                    </button>
-                    {onDelete && (
-                        <button onClick={onDelete} className="w-6 h-6 bg-[#C0C0C0] border-2 border-white border-b-[#404040] border-r-[#404040] active:border-[#404040] active:border-b-white active:border-r-white flex items-center justify-center" title="Eject">
-                             <Trash2 className="w-3 h-3 text-red-700" />
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* Upload Action */}
-            {isLocal && (
-                <div className="mt-2">
-                     {isUploading ? (
-                         <div className="text-[10px] font-bold text-black text-center animate-pulse">
-                             UPLOADING... {Math.round(uploadProgress || 0)}%
-                         </div>
-                     ) : (
-                         <button 
-                            onClick={onUpload}
-                            className="w-full py-1 bg-[#000080] text-white text-[10px] font-bold border-2 border-[#404040] border-t-[#8080ff] border-l-[#8080ff] hover:bg-[#1084d0] active:border-[#8080ff] active:border-t-[#404040] active:border-l-[#404040]"
-                         >
-                            UPLOAD TO CLOUD
+                 <div className="flex gap-2">
+                     <button onClick={onReplace} className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200">
+                         替换文件
+                     </button>
+                     {onDelete && (
+                         <button onClick={onDelete} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                              <Trash2 className="w-4 h-4" />
                          </button>
                      )}
-                </div>
-            )}
+                 </div>
+             </div>
+
+             {/* Upload Action */}
+             {isLocal && (
+                 <div className="mt-4 pt-3 border-t border-slate-100">
+                      {isUploading ? (
+                          <div className="flex items-center gap-3">
+                              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-blue-500 rounded-full transition-all" style={{width: `${uploadProgress}%`}}></div>
+                              </div>
+                              <span className="text-xs font-bold text-blue-600">{Math.round(uploadProgress || 0)}%</span>
+                          </div>
+                      ) : (
+                          <button 
+                             onClick={onUpload}
+                             className="w-full py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center gap-2"
+                          >
+                             <CloudUpload className="w-4 h-4" /> 上传到云端
+                          </button>
+                      )}
+                 </div>
+             )}
         </div>
     );
 };
@@ -223,20 +207,20 @@ const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnl
   const charCount = (value || '').length;
 
   return (
-    <div className="bg-white border-2 border-white shadow-[inset_0_0_20px_rgba(0,0,0,0.05)] rounded-xl overflow-hidden flex flex-col h-full max-h-[600px]">
-      <div className="bg-gradient-to-r from-slate-100 to-slate-200 px-4 py-2 border-b border-white flex justify-between items-center flex-shrink-0">
+    <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden flex flex-col h-full max-h-[600px]">
+      <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
         <div className="flex items-center gap-3">
-             <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest">{title}</h4>
+             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">{title}</h4>
              {showStats && (
-                 <span className="text-[9px] font-mono text-slate-400 font-bold border border-slate-300 px-1 rounded bg-white">
-                    {charCount} CHARS
+                 <span className="text-[10px] text-slate-400 font-medium bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                    {charCount} 字
                  </span>
              )}
         </div>
         <div className="flex items-center gap-2">
             {!readOnly && onSave && isDirty && (
-                 <button onClick={handleSave} className="flex items-center gap-1 text-[10px] font-bold text-white bg-green-500 px-2 py-1 rounded shadow-sm border border-green-400">
-                    <Check className="w-3 h-3" /> SAVE
+                 <button onClick={handleSave} className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded hover:bg-emerald-100">
+                    <Check className="w-3 h-3" /> 保存
                  </button>
             )}
             <RowCopyButton text={value} />
@@ -244,60 +228,33 @@ const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnl
       </div>
       {onSave && !readOnly ? (
         <textarea 
-            className="flex-1 w-full p-4 text-sm text-slate-700 leading-relaxed font-mono outline-none resize-none bg-white/50 focus:bg-white transition-colors"
+            className="flex-1 w-full p-4 text-sm text-slate-700 leading-relaxed outline-none resize-none bg-white focus:bg-slate-50/50 transition-colors"
             value={value}
             onChange={handleChange}
-            placeholder={placeholder || "..."}
+            placeholder={placeholder || "在此输入或生成内容..."}
         />
       ) : (
-        <div className="p-4 overflow-y-auto whitespace-pre-wrap text-sm text-slate-700 leading-relaxed font-mono flex-1">
-          {content || <span className="text-slate-400 italic">...</span>}
+        <div className="p-4 overflow-y-auto whitespace-pre-wrap text-sm text-slate-700 leading-relaxed flex-1">
+          {content || <span className="text-slate-400 italic">暂无内容</span>}
         </div>
       )}
     </div>
   );
 };
 
-interface TableResultBoxProps<T> {
-    headers: string[];
-    data: T[];
-    renderRow: (item: T, index: number) => React.ReactNode;
-}
-
-const TableResultBox = <T extends any>({ headers, data, renderRow }: TableResultBoxProps<T>) => (
-  <div className="bg-white border-2 border-white shadow-inner rounded-xl overflow-hidden h-full flex flex-col">
-    <div className="overflow-x-auto flex-1">
-      <table className="w-full text-left border-collapse">
-        <thead className="bg-gradient-to-r from-slate-100 to-slate-200 border-b border-white sticky top-0 z-10">
-          <tr>
-            {headers.map((h: string) => (
-              <th key={h} className="py-2 px-4 text-[10px] font-black text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {data && data.length > 0 ? data.map(renderRow) : (
-            <tr><td colSpan={headers.length} className="text-center py-8 text-slate-400 text-sm">No Data</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
-
 // --- Configuration ---
 
 const NODE_WIDTH = 280;
-const NODE_HEIGHT = 180;
+const NODE_HEIGHT = 160;
 
 // Workflow Layout Definition
 const NODES_CONFIG = [
-  { id: 'input', label: 'INPUT', panelTitle: 'Project Input', icon: Layout, color: 'blue', description: 'Topic & Tone', x: 50, y: 300 },
-  { id: 'script', label: 'SCRIPT', panelTitle: 'Script Editor', icon: FileText, color: 'violet', promptKey: 'SCRIPT', description: 'Generate Full Script', model: 'Gemini 2.5', x: 450, y: 300 },
-  { id: 'titles', label: 'TITLES', panelTitle: 'Viral Titles', icon: Type, color: 'amber', promptKey: 'TITLES', description: 'Clickbait Generator', model: 'Gemini 2.5', x: 850, y: 100 },
-  { id: 'audio_file', label: 'AUDIO', panelTitle: 'Audio Upload', icon: FileAudio, color: 'fuchsia', description: 'Upload MP3/WAV', x: 850, y: 300 },
-  { id: 'summary', label: 'SUMMARY', panelTitle: 'Description & Tags', icon: List, color: 'emerald', promptKey: 'SUMMARY', description: 'SEO Metadata', model: 'Gemini 2.5', x: 850, y: 500 },
-  { id: 'cover', label: 'COVER', panelTitle: 'Thumbnail Plan', icon: Palette, color: 'rose', promptKey: 'COVER_GEN', description: 'Visual & Copy', model: 'Gemini 2.5', x: 850, y: 700 },
+  { id: 'input', label: '项目输入', panelTitle: '项目策划', icon: Layout, color: 'blue', description: '定义主题与基调', x: 50, y: 300 },
+  { id: 'script', label: '视频脚本', panelTitle: '脚本编辑器', icon: FileText, color: 'violet', promptKey: 'SCRIPT', description: '生成完整口播文案', model: 'Gemini 2.5', x: 450, y: 300 },
+  { id: 'titles', label: '爆款标题', panelTitle: '标题策划', icon: Type, color: 'amber', promptKey: 'TITLES', description: '生成高点击率标题', model: 'Gemini 2.5', x: 850, y: 100 },
+  { id: 'audio_file', label: '上传MP3文件', panelTitle: '上传音频文件', icon: FileAudio, color: 'fuchsia', description: '上传配音/BGM文件', x: 850, y: 300 },
+  { id: 'summary', label: '简介与标签', panelTitle: '发布元数据', icon: List, color: 'emerald', promptKey: 'SUMMARY', description: 'SEO 简介与标签', model: 'Gemini 2.5', x: 850, y: 500 },
+  { id: 'cover', label: '封面策划', panelTitle: '封面方案', icon: Palette, color: 'rose', promptKey: 'COVER_GEN', description: '画面描述与文案', model: 'Gemini 2.5', x: 850, y: 700 },
 ];
 
 const CONNECTIONS = [
@@ -357,7 +314,7 @@ const ProjectWorkspace: React.FC = () => {
   const handleAudioFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 100 * 1024 * 1024) { alert('File too large'); return; }
+    if (file.size > 100 * 1024 * 1024) { alert('文件过大'); return; }
     if (pendingAudio?.url) URL.revokeObjectURL(pendingAudio.url);
     const url = URL.createObjectURL(file);
     setPendingAudio({ file, url });
@@ -373,7 +330,7 @@ const ProjectWorkspace: React.FC = () => {
           setProject(updated);
           await storage.saveProject(updated);
           setPendingAudio(null);
-      } catch(e) { alert('Upload failed'); }
+      } catch(e) { alert('上传失败'); }
       setIsUploading(false);
   };
 
@@ -395,10 +352,10 @@ const ProjectWorkspace: React.FC = () => {
       return `M ${sx} ${sy} C ${sx + (ex - sx) / 2} ${sy} ${ex - (ex - sx) / 2} ${ey} ${ex} ${ey}`;
   };
 
-  if (loading || !project) return <div className="flex justify-center items-center h-full text-white font-bold">LOADING...</div>;
+  if (loading || !project) return <div className="flex justify-center items-center h-full text-slate-500 font-bold">加载中...</div>;
 
   return (
-    <div className="flex h-full relative overflow-hidden bg-gradient-to-br from-[#c9d6ff] to-[#e2e2e2]">
+    <div className="flex h-full relative overflow-hidden bg-slate-50">
         
         {/* Canvas Area */}
         <div 
@@ -423,12 +380,12 @@ const ProjectWorkspace: React.FC = () => {
                  }
             }}
         >
-             {/* Y2K Grid Background */}
+             {/* Dot Grid Background */}
             <div 
-                className="absolute inset-0 opacity-20 pointer-events-none"
+                className="absolute inset-0 opacity-10 pointer-events-none"
                 style={{
-                    backgroundImage: 'linear-gradient(rgba(0,0,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,255,0.3) 1px, transparent 1px)',
-                    backgroundSize: `${40 * transform.scale}px ${40 * transform.scale}px`,
+                    backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
+                    backgroundSize: `${24 * transform.scale}px ${24 * transform.scale}px`,
                     backgroundPosition: `${transform.x}px ${transform.y}px`
                 }}
             />
@@ -444,58 +401,52 @@ const ProjectWorkspace: React.FC = () => {
                             <path 
                                 key={idx}
                                 d={getCurvePath(fromNode, toNode)}
-                                stroke="rgba(255,255,255,0.8)"
-                                strokeWidth="4"
+                                stroke="#cbd5e1"
+                                strokeWidth="2"
                                 fill="none"
-                                className="drop-shadow-md"
                             />
                         );
                     })}
                 </svg>
 
-                {/* Y2K Nodes */}
+                {/* Nodes */}
                 {NODES_CONFIG.map((node) => {
                      const isActive = selectedNodeId === node.id;
                      const isGenerating = generatingNodes.has(node.id);
                      let hasData = false;
-                     // Logic checks...
                      if (node.id === 'audio_file') hasData = !!project.audioFile || !!pendingAudio;
-                     // ...
 
                      return (
                          <div 
                             key={node.id}
                             style={{ left: node.x, top: node.y, width: NODE_WIDTH, height: NODE_HEIGHT }}
-                            className={`absolute rounded-[20px] transition-all cursor-pointer border-2 shadow-[8px_8px_16px_rgba(0,0,0,0.1),inset_0_0_0_1px_rgba(255,255,255,0.5)] backdrop-blur-md overflow-hidden group hover:scale-105 ${
+                            className={`absolute bg-white rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden group hover:shadow-md ${
                                 isActive 
-                                ? 'bg-white/90 border-blue-400 ring-4 ring-blue-200/50 z-20' 
-                                : 'bg-white/60 border-white hover:border-blue-200'
+                                ? `ring-2 ring-offset-2 ring-${node.color}-400 border-${node.color}-200` 
+                                : 'border-slate-200 hover:border-slate-300'
                             }`}
                             onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}
                          >
-                             {/* Glossy Header */}
-                             <div className={`h-12 w-full bg-gradient-to-r from-${node.color}-400 to-${node.color}-500 flex items-center px-4 justify-between relative overflow-hidden`}>
-                                 <div className="absolute inset-0 bg-white/20 skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-                                 <div className="flex items-center gap-2 text-white font-black italic tracking-wider shadow-black drop-shadow-sm z-10">
-                                     <node.icon className="w-5 h-5" />
+                             {/* Header */}
+                             <div className={`h-12 w-full border-b border-slate-100 flex items-center px-4 justify-between bg-gradient-to-r from-white to-slate-50`}>
+                                 <div className="flex items-center gap-2 font-bold text-slate-700">
+                                     <node.icon className={`w-5 h-5 text-${node.color}-500`} />
                                      {node.label}
                                  </div>
-                                 <div className="w-3 h-3 rounded-full bg-white/30 border border-white/50 shadow-inner"></div>
+                                 {isActive && <div className={`w-2 h-2 rounded-full bg-${node.color}-500 animate-pulse`}></div>}
                              </div>
 
-                             <div className="p-5 flex flex-col justify-between h-[calc(100%-48px)]">
-                                <p className="text-xs font-bold text-slate-500 leading-snug">{node.description}</p>
+                             <div className="p-5 flex flex-col justify-between flex-1">
+                                <p className="text-xs text-slate-500 font-medium leading-relaxed">{node.description}</p>
                                 
                                 <div className="flex justify-end mt-auto">
-                                    <button 
-                                        className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide border transition-all ${
-                                            hasData 
-                                            ? 'bg-gradient-to-b from-green-300 to-green-500 text-white border-green-200 shadow-sm' 
-                                            : `bg-gradient-to-b from-slate-100 to-slate-200 text-slate-500 border-white shadow-sm hover:from-white hover:to-slate-100`
-                                        }`}
-                                    >
-                                        {isGenerating ? 'PROCESSING...' : hasData ? 'READY' : 'ACTION'}
-                                    </button>
+                                    <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
+                                        hasData 
+                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                                        : 'bg-slate-50 text-slate-400 border-slate-100'
+                                    }`}>
+                                        {isGenerating ? '处理中...' : hasData ? '已完成' : '待处理'}
+                                    </span>
                                 </div>
                              </div>
                          </div>
@@ -504,30 +455,30 @@ const ProjectWorkspace: React.FC = () => {
             </div>
         </div>
 
-        {/* Right Sidebar - Metallic Glass Panel */}
-        <div className={`absolute top-4 right-4 bottom-4 w-[500px] bg-white/70 backdrop-blur-2xl border-2 border-white/60 rounded-[32px] shadow-[0_20px_40px_rgba(0,0,0,0.1)] transition-transform duration-300 z-30 flex flex-col overflow-hidden ${selectedNodeId ? 'translate-x-0' : 'translate-x-[110%]'}`}>
+        {/* Right Sidebar - Clean Panel */}
+        <div className={`absolute top-0 right-0 bottom-0 w-[500px] bg-white border-l border-slate-200 shadow-xl transition-transform duration-300 z-30 flex flex-col ${selectedNodeId ? 'translate-x-0' : 'translate-x-full'}`}>
             {/* Sidebar Header */}
-            <div className="h-16 flex items-center justify-between px-6 border-b border-white/50 bg-white/40">
-                <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+            <div className="h-14 flex items-center justify-between px-6 border-b border-slate-100 bg-white">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2">
                     {selectedNodeId && (() => {
                         const n = NODES_CONFIG.find(x => x.id === selectedNodeId);
                         return <><n.icon className={`w-5 h-5 text-${n?.color}-500`} /> {n?.panelTitle}</>
                     })()}
                 </h3>
-                <button onClick={() => setSelectedNodeId(null)} className="p-2 hover:bg-white/50 rounded-full transition-colors">
-                    <PanelRightClose className="w-5 h-5 text-slate-500" />
+                <button onClick={() => setSelectedNodeId(null)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600">
+                    <PanelRightClose className="w-5 h-5" />
                 </button>
             </div>
 
             {/* Sidebar Content */}
-            <div className="flex-1 overflow-y-auto p-6 bg-transparent">
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
                  {selectedNodeId === 'audio_file' && (
                     <div className="flex flex-col h-full gap-4">
                         {/* Split View: Script Top */}
-                        <div className="flex-1 bg-white/50 rounded-2xl border-2 border-white p-4 overflow-y-auto shadow-inner">
-                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 sticky top-0 bg-white/0 backdrop-blur-sm py-1">Reference Script</h4>
-                            <p className="text-sm font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">
-                                {project.script || "No script generated yet."}
+                        <div className="flex-1 bg-white rounded-2xl border border-slate-200 p-4 overflow-y-auto shadow-sm">
+                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 sticky top-0 bg-white py-1">参考脚本</h4>
+                            <p className="text-lg font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                {project.script || "暂无脚本内容。"}
                             </p>
                         </div>
 
@@ -538,7 +489,7 @@ const ProjectWorkspace: React.FC = () => {
                             {(project.audioFile || pendingAudio) ? (
                                 <FancyAudioPlayer 
                                     src={pendingAudio ? pendingAudio.url : project.audioFile!}
-                                    fileName={pendingAudio ? pendingAudio.file.name : 'AUDIO_TRACK.MP3'}
+                                    fileName={pendingAudio ? pendingAudio.file.name : '音频文件.mp3'}
                                     isLocal={!!pendingAudio}
                                     isUploading={isUploading}
                                     uploadProgress={audioUploadProgress}
@@ -549,12 +500,12 @@ const ProjectWorkspace: React.FC = () => {
                             ) : (
                                 <div 
                                     onClick={() => audioInputRef.current?.click()}
-                                    className="h-32 rounded-xl border-4 border-dashed border-slate-300 hover:border-fuchsia-400 bg-slate-50/50 hover:bg-white transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group"
+                                    className="h-32 rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-400 bg-white hover:bg-blue-50 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group"
                                 >
-                                    <div className="w-12 h-12 rounded-full bg-slate-200 group-hover:bg-fuchsia-100 flex items-center justify-center transition-colors">
-                                        <FileAudio className="w-6 h-6 text-slate-400 group-hover:text-fuchsia-500" />
+                                    <div className="w-12 h-12 rounded-full bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                                        <FileAudio className="w-6 h-6 text-slate-400 group-hover:text-blue-500" />
                                     </div>
-                                    <span className="text-xs font-bold text-slate-400 group-hover:text-fuchsia-500 uppercase">Click to Select Audio</span>
+                                    <span className="text-sm font-bold text-slate-500 group-hover:text-blue-600">点击选择音频文件</span>
                                 </div>
                             )}
                         </div>
@@ -563,14 +514,14 @@ const ProjectWorkspace: React.FC = () => {
 
                  {selectedNodeId === 'script' && (
                     <TextResultBox 
-                        title="VIDEO SCRIPT" 
+                        title="视频脚本" 
                         content={project.script || ''} 
-                        placeholder="AI will generate script here..."
+                        placeholder="AI 将在此生成脚本..."
                         onSave={(val) => { /* update logic */ }} 
                     />
                  )}
                  
-                 {/* ... other node types rendered similarly with Y2K styled components ... */}
+                 {/* ... other node types rendered similarly with clean components ... */}
             </div>
         </div>
 
@@ -579,4 +530,3 @@ const ProjectWorkspace: React.FC = () => {
 };
 
 export default ProjectWorkspace;
-
