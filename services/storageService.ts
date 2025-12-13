@@ -285,6 +285,32 @@ export const syncProject = async (id: string): Promise<ProjectData | null> => {
 
 // --- Image Operations (R2) ---
 
+export const uploadFile = async (file: File, projectId?: string): Promise<string> => {
+  const ext = file.name.split('.').pop() || 'bin';
+  const filename = `${crypto.randomUUID()}.${ext}`;
+
+  // Upload to R2 Endpoint with optional project folder param
+  const url = new URL(`${window.location.origin}${API_BASE}/images/${filename}`);
+  if (projectId) {
+      url.searchParams.set('project', projectId);
+  }
+
+  const res = await fetch(url.toString(), {
+    method: 'PUT',
+    headers: {
+        'Content-Type': file.type || 'application/octet-stream'
+    },
+    body: file
+  });
+
+  if (!res.ok) {
+    throw new Error('File upload failed');
+  }
+  
+  const data = await res.json();
+  return data.url; // e.g. /api/images/encodedPath
+};
+
 export const uploadImage = async (base64: string, projectId?: string): Promise<string> => {
   // Convert base64 to blob
   const byteString = atob(base64.split(',')[1]);
@@ -363,7 +389,9 @@ const checkProjectCompletion = (p: ProjectData): boolean => {
   // Criteria: Script, Titles, Storyboard (Text), Summary, Cover, and at least 1 generated Image
   const hasScript = !!p.script && p.script.length > 0;
   const hasTitles = !!p.titles && p.titles.length > 0;
-  const hasSbText = !!p.storyboard && p.storyboard.length > 0;
+  // NOTE: If user uses Audio File mode, storyboard text might be empty.
+  // We relax this check slightly or assume audioFile counts as 'step done' if storyboard is empty.
+  const hasSbText = (!!p.storyboard && p.storyboard.length > 0) || !!p.audioFile;
   const hasSummary = !!p.summary && p.summary.length > 0;
   const hasCover = !!p.coverOptions && p.coverOptions.length > 0;
   const hasImages = p.storyboard?.some(f => !!f.imageUrl) || false;
@@ -449,6 +477,11 @@ export const deleteProject = async (id: string): Promise<void> => {
     // Collect cover image
     if (project.coverImage?.imageUrl && project.coverImage.imageUrl.includes('/api/images/')) {
       imagesToDelete.push(project.coverImage.imageUrl);
+    }
+    
+    // Collect audio file
+    if (project.audioFile && project.audioFile.includes('/api/images/')) {
+      imagesToDelete.push(project.audioFile);
     }
 
     // Execute deletes in background
