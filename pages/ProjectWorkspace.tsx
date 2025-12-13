@@ -703,15 +703,6 @@ const ProjectWorkspace: React.FC = () => {
                                             <RowCopyButton text={item.title} />
                                         </div>
                                         <h4 className="text-slate-800 font-bold mb-2">{item.title}</h4>
-                                        {item.keywords && (
-                                            <div className="flex flex-wrap gap-1">
-                                                {item.keywords.split(/[,，]/).map((k, i) => (
-                                                    <span key={i} className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-100">
-                                                        {k.trim()}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -746,12 +737,6 @@ const ProjectWorkspace: React.FC = () => {
                                             )}
                                         </div>
                                         <div className="p-4 space-y-4">
-                                            <div>
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">画面描述</span>
-                                                <div className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                                    {item.visual}
-                                                </div>
-                                            </div>
                                             <div>
                                                 <div className="flex justify-between items-center mb-1">
                                                     <span className="text-[10px] font-bold text-slate-400 uppercase block">封面文案</span>
