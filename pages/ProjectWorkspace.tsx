@@ -743,46 +743,70 @@ const ProjectWorkspace: React.FC = () => {
                             </div>
                         ) : (
                             <div className="space-y-6">
-                                {project.coverOptions.map((item, idx) => (
-                                    <div key={idx} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center">
-                                            <span className="text-xs font-bold text-slate-500 uppercase">方案 {idx + 1}</span>
-                                            {item.score && (
-                                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{item.score} 推荐</span>
-                                            )}
-                                        </div>
-                                        <div className="p-4 space-y-4">
-                                            <div>
-                                                <div className="flex justify-between items-center mb-1">
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase block">封面文案</span>
-                                                    <RowCopyButton text={`${item.titleTop || item.copy || ''}\n${item.titleBottom || ''}`} />
-                                                </div>
-                                                
-                                                {/* Rendering Main Title (Top) and Sub Title (Bottom) */}
-                                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
-                                                    {/* Main Title - Prominent */}
-                                                    <div className="space-y-1">
-                                                        <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-1 rounded uppercase tracking-wider">主标题 (上行)</span>
-                                                        <div className="text-lg font-black text-slate-900 leading-tight">
-                                                            {item.titleTop || item.copy || '—'}
-                                                        </div>
+                                {project.coverOptions.map((item, idx) => {
+                                    // Logic to automatically split Top Title if separators exist
+                                    let displayTop = item.titleTop || item.copy || '';
+                                    let displayBottom = item.titleBottom || '';
+
+                                    // Check for separators /, -, or space to split the main title
+                                    let splitIndex = -1;
+                                    
+                                    if (displayTop.includes('/')) splitIndex = displayTop.indexOf('/');
+                                    else if (displayTop.includes('-')) splitIndex = displayTop.indexOf('-');
+                                    else if (displayTop.includes(' ')) splitIndex = displayTop.indexOf(' ');
+
+                                    if (splitIndex !== -1) {
+                                        const p1 = displayTop.substring(0, splitIndex).trim();
+                                        const p2 = displayTop.substring(splitIndex + 1).trim();
+                                        // If split results in two non-empty parts, use them
+                                        // This overrides existing bottom title if split happens
+                                        if (p1 && p2) {
+                                            displayTop = p1;
+                                            displayBottom = p2;
+                                        }
+                                    }
+
+                                    return (
+                                        <div key={idx} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                            <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center">
+                                                <span className="text-xs font-bold text-slate-500 uppercase">方案 {idx + 1}</span>
+                                                {item.score && (
+                                                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{item.score} 推荐</span>
+                                                )}
+                                            </div>
+                                            <div className="p-4 space-y-4">
+                                                <div>
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase block">封面文案</span>
+                                                        <RowCopyButton text={`${displayTop}\n${displayBottom}`} />
                                                     </div>
+                                                    
+                                                    {/* Rendering Main Title (Top) and Sub Title (Bottom) */}
+                                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                                        {/* Main Title - Prominent */}
+                                                        <div className="space-y-1">
+                                                            <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-1 rounded uppercase tracking-wider">主标题 (上行)</span>
+                                                            <div className="text-lg font-black text-slate-900 leading-tight">
+                                                                {displayTop || '—'}
+                                                            </div>
+                                                        </div>
 
-                                                    {/* Divider */}
-                                                    <div className="border-t border-slate-200 border-dashed"></div>
+                                                        {/* Divider */}
+                                                        <div className="border-t border-slate-200 border-dashed"></div>
 
-                                                    {/* Sub Title - Secondary */}
-                                                    <div className="space-y-1">
-                                                        <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1 rounded uppercase tracking-wider">副标题 (下行)</span>
-                                                        <div className="text-sm font-bold text-slate-600 leading-snug">
-                                                            {item.titleBottom || '—'}
+                                                        {/* Sub Title - Secondary */}
+                                                        <div className="space-y-1">
+                                                            <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1 rounded uppercase tracking-wider">副标题 (下行)</span>
+                                                            <div className="text-sm font-bold text-slate-600 leading-snug">
+                                                                {displayBottom || '—'}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                      </div>
