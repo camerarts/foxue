@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProjectData, ProjectStatus } from '../types';
@@ -222,13 +223,8 @@ const Dashboard: React.FC = () => {
                  syncStatus === 'error' ? '同步失败' :
                  '准备就绪'}
             </div>
-
-            <button 
-              onClick={handleCreate}
-              className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white px-6 py-2.5 md:py-3 rounded-xl font-semibold transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5 flex items-center justify-center gap-2 w-full md:w-auto text-sm md:text-base"
-            >
-              <Plus className="w-5 h-5" /> <span className="md:hidden">新建</span><span className="hidden md:inline">新建项目</span>
-            </button>
+            
+            {/* New Project button removed from here as requested */}
         </div>
       </div>
 
