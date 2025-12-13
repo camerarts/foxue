@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
@@ -1168,58 +1167,71 @@ const ProjectWorkspace: React.FC = () => {
                  )}
 
                  {selectedNodeId === 'audio_file' && (
-                    <div className="flex flex-col h-full items-center justify-center p-6 text-center">
-                        <input 
-                            type="file" 
-                            ref={audioInputRef} 
-                            accept="audio/*" 
-                            className="hidden" 
-                            onChange={handleAudioFileSelect}
-                        />
+                    <div className="flex flex-col h-full overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        {/* TOP: Script Display */}
+                        <div className="flex-1 h-0 overflow-y-auto p-5 bg-slate-50/50">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 sticky top-0 bg-[#F9FAFB] py-2 z-10 border-b border-slate-100/50 backdrop-blur-sm">
+                                参考视频脚本
+                            </h3>
+                            <div className="text-lg text-slate-700 font-medium leading-loose whitespace-pre-wrap font-sans selection:bg-violet-100 selection:text-violet-900">
+                                {project.script || <span className="text-slate-400 italic text-base">暂无脚本内容，请先在脚本节点生成。</span>}
+                            </div>
+                        </div>
 
-                        {(project.audioFile || pendingAudio) ? (
-                            <div className="w-full space-y-6 animate-in zoom-in-95 duration-300">
-                                <FancyAudioPlayer 
-                                    src={pendingAudio ? pendingAudio.url : project.audioFile!}
-                                    fileName={pendingAudio ? pendingAudio.file.name : decodeURIComponent(project.audioFile!.split('/').pop() || 'audio.mp3')}
-                                    isLocal={!!pendingAudio}
-                                    isUploading={isUploading}
-                                    uploadProgress={audioUploadProgress}
-                                    onReplace={() => audioInputRef.current?.click()}
-                                    onDelete={async () => {
-                                        if(confirm('确定要删除此音频文件吗？')) {
-                                            if (pendingAudio) {
-                                                setPendingAudio(null);
-                                            } else {
-                                                await saveProjectUpdate(p => ({ ...p, audioFile: undefined }));
+                        {/* BOTTOM: Audio Player / Upload */}
+                        <div className="flex-none p-5 bg-white z-20 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.05)] border-t border-slate-100">
+                             <input 
+                                type="file" 
+                                ref={audioInputRef} 
+                                accept="audio/*" 
+                                className="hidden" 
+                                onChange={handleAudioFileSelect}
+                            />
+
+                            {(project.audioFile || pendingAudio) ? (
+                                <div className="w-full space-y-6 animate-in zoom-in-95 duration-300">
+                                    <FancyAudioPlayer 
+                                        src={pendingAudio ? pendingAudio.url : project.audioFile!}
+                                        fileName={pendingAudio ? pendingAudio.file.name : decodeURIComponent(project.audioFile!.split('/').pop() || 'audio.mp3')}
+                                        isLocal={!!pendingAudio}
+                                        isUploading={isUploading}
+                                        uploadProgress={audioUploadProgress}
+                                        onReplace={() => audioInputRef.current?.click()}
+                                        onDelete={async () => {
+                                            if(confirm('确定要删除此音频文件吗？')) {
+                                                if (pendingAudio) {
+                                                    setPendingAudio(null);
+                                                } else {
+                                                    await saveProjectUpdate(p => ({ ...p, audioFile: undefined }));
+                                                }
                                             }
-                                        }
-                                    }}
-                                    onUpload={executeAudioUpload}
-                                />
-                            </div>
-                        ) : (
-                            <div 
-                                className="w-full h-64 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center bg-slate-50/50 hover:bg-slate-50 transition-colors gap-4 cursor-pointer group"
-                                onClick={() => audioInputRef.current?.click()}
-                            >
-                                 <div className="w-16 h-16 bg-fuchsia-50 text-fuchsia-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
-                                    <Upload className="w-8 h-8" />
-                                 </div>
-                                 <div>
-                                     <h3 className="text-lg font-bold text-slate-700">点击选择音频文件</h3>
-                                     <p className="text-sm text-slate-400 mt-1">支持 MP3, WAV 等格式 (最大100MB)</p>
-                                 </div>
-                                 <button 
-                                    onClick={(e) => { e.stopPropagation(); audioInputRef.current?.click(); }}
-                                    disabled={isUploading}
-                                    className="px-6 py-2.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-xl font-bold shadow-lg shadow-fuchsia-500/30 transition-all flex items-center gap-2 text-sm"
-                                 >
-                                    <Upload className="w-4 h-4" />
-                                    选择文件
-                                 </button>
-                            </div>
-                        )}
+                                        }}
+                                        onUpload={executeAudioUpload}
+                                    />
+                                </div>
+                            ) : (
+                                <div 
+                                    className="w-full h-40 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center bg-slate-50/50 hover:bg-slate-50 transition-colors gap-3 cursor-pointer group"
+                                    onClick={() => audioInputRef.current?.click()}
+                                >
+                                     <div className="w-12 h-12 bg-fuchsia-50 text-fuchsia-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+                                        <Upload className="w-6 h-6" />
+                                     </div>
+                                     <div>
+                                         <h3 className="text-base font-bold text-slate-700">点击选择音频文件</h3>
+                                         <p className="text-xs text-slate-400 mt-1">支持 MP3, WAV 等格式 (最大100MB)</p>
+                                     </div>
+                                     <button 
+                                        onClick={(e) => { e.stopPropagation(); audioInputRef.current?.click(); }}
+                                        disabled={isUploading}
+                                        className="px-4 py-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-lg font-bold shadow-lg shadow-fuchsia-500/30 transition-all flex items-center gap-2 text-xs"
+                                     >
+                                        <Upload className="w-3.5 h-3.5" />
+                                        选择文件
+                                     </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                  )}
             </div>
@@ -1229,3 +1241,4 @@ const ProjectWorkspace: React.FC = () => {
 };
 
 export default ProjectWorkspace;
+
