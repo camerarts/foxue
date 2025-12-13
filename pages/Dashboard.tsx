@@ -159,14 +159,17 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // UPDATED COMPLETION LOGIC
   const isProjectFullyComplete = (p: ProjectData) => {
       const hasScript = !!p.script && p.script.length > 0;
       const hasTitles = !!p.titles && p.titles.length > 0;
-      const hasSbText = !!p.storyboard && p.storyboard.length > 0;
+      // Replaced storyboard/images check with audioFile check
+      const hasAudio = !!p.audioFile; 
       const hasSummary = !!p.summary && p.summary.length > 0;
       const hasCover = !!p.coverOptions && p.coverOptions.length > 0;
-      const hasImages = p.storyboard?.some(f => !!f.imageUrl) || false;
-      return hasScript && hasTitles && hasSbText && hasSummary && hasCover && hasImages;
+      
+      // Canvas Modules: Script, Titles, Audio File, Summary, Cover
+      return hasScript && hasTitles && hasAudio && hasSummary && hasCover;
   };
 
   const getEffectiveStatus = (p: ProjectData): ProjectStatus => {
