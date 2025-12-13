@@ -285,7 +285,7 @@ export const syncProject = async (id: string): Promise<ProjectData | null> => {
 
 // --- Image Operations (R2) ---
 
-export const uploadFile = async (file: File, projectId?: string): Promise<string> => {
+export const uploadFile = async (file: File, projectId?: string, onProgress?: (percent: number) => void): Promise<string> => {
   const ext = file.name.split('.').pop() || 'bin';
   const filename = `${crypto.randomUUID()}.${ext}`;
 
@@ -295,35 +295,47 @@ export const uploadFile = async (file: File, projectId?: string): Promise<string
       url.searchParams.set('project', projectId);
   }
 
-  const res = await fetch(url.toString(), {
-    method: 'PUT',
-    headers: {
-        'Content-Type': file.type || 'application/octet-stream'
-    },
-    body: file
-  });
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url.toString());
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
-  if (!res.ok) {
-    let errMessage = `Upload failed (${res.status})`;
-    try {
-        // Read response text ONCE to avoid "body stream already read" error
-        const text = await res.text();
-        try {
-            const errorData = JSON.parse(text);
-            if (errorData.error) errMessage += `: ${errorData.error}`;
-            else if (text) errMessage += `: ${text.substring(0, 100)}`;
-        } catch {
-            // If not JSON, append text snippet
-            if (text) errMessage += `: ${text.substring(0, 100)}`;
-        }
-    } catch (e) {
-        console.warn("Failed to read error response body", e);
+    if (onProgress) {
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const percentComplete = (event.loaded / event.total) * 100;
+                onProgress(percentComplete);
+            }
+        };
     }
-    throw new Error(errMessage);
-  }
-  
-  const data = await res.json();
-  return data.url; // e.g. /api/images/encodedPath
+
+    xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+                const data = JSON.parse(xhr.responseText);
+                resolve(data.url);
+            } catch (e) {
+                reject(new Error("Invalid server response format"));
+            }
+        } else {
+            let errMessage = `Upload failed (${xhr.status})`;
+            try {
+                const errorData = JSON.parse(xhr.responseText);
+                if (errorData.error) errMessage += `: ${errorData.error}`;
+                else if (xhr.responseText) errMessage += `: ${xhr.responseText.substring(0, 100)}`;
+            } catch {
+                if (xhr.responseText) errMessage += `: ${xhr.responseText.substring(0, 100)}`;
+            }
+            reject(new Error(errMessage));
+        }
+    };
+
+    xhr.onerror = () => {
+        reject(new Error("Network Error"));
+    };
+
+    xhr.send(file);
+  });
 };
 
 export const uploadImage = async (base64: string, projectId?: string): Promise<string> => {
