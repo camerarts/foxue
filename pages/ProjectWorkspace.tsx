@@ -183,18 +183,22 @@ interface TextResultBoxProps {
     placeholder?: string;
     showStats?: boolean;
     readOnly?: boolean;
+    autoCleanAsterisks?: boolean;
 }
 
-const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnly }: TextResultBoxProps) => {
-  const [value, setValue] = useState(content || '');
+const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnly, autoCleanAsterisks }: TextResultBoxProps) => {
+  // Helper to remove asterisks if autoCleanAsterisks is enabled
+  const cleanText = (txt: string) => autoCleanAsterisks ? txt.replace(/\*/g, '') : txt;
+
+  const [value, setValue] = useState(cleanText(content || ''));
   const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
-    if (!isDirty) setValue(content || '');
-  }, [content, isDirty]);
+    if (!isDirty) setValue(cleanText(content || ''));
+  }, [content, isDirty, autoCleanAsterisks]);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setValue(e.target.value);
+    setValue(cleanText(e.target.value));
     setIsDirty(true);
   };
 
@@ -378,7 +382,9 @@ const ProjectWorkspace: React.FC = () => {
                 .replace('{{topic}}', project.inputs.topic || project.title)
                 .replace('{{tone}}', project.inputs.tone)
                 .replace('{{language}}', project.inputs.language) || '';
-            const text = await gemini.generateText(inputPrompt);
+            let text = await gemini.generateText(inputPrompt);
+            // Auto clean asterisks from generated script
+            text = text.replace(/\*/g, '');
             update = { script: text };
         } else if (nodeId === 'titles') {
              const p = promptTemplate
@@ -683,6 +689,7 @@ const ProjectWorkspace: React.FC = () => {
                         placeholder="AI 将在此生成脚本..."
                         onSave={(val) => updateProjectField('script', val)} 
                         showStats={true}
+                        autoCleanAsterisks={true}
                     />
                  )}
 
@@ -788,3 +795,4 @@ const ProjectWorkspace: React.FC = () => {
 };
 
 export default ProjectWorkspace;
+
