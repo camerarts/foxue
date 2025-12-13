@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
@@ -10,7 +8,7 @@ import {
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones
 } from 'lucide-react';
 
 // --- Sub-Components ---
@@ -141,8 +139,8 @@ const NODES_CONFIG = [
   { id: 'script', label: '视频脚本', panelTitle: '视频文案脚本编辑器', icon: FileText, color: 'violet', promptKey: 'SCRIPT', description: '生成分章节的详细脚本', model: 'Gemini 2.5 Flash Preview', x: 450, y: 300 },
   // Column 2: Outputs from Script
   { id: 'titles', label: '爆款标题', panelTitle: '爆款标题方案', icon: Type, color: 'amber', promptKey: 'TITLES', description: '生成高点击率标题', model: 'Gemini 2.5 Flash', x: 850, y: 100 },
-  // Changed Node: sb_text -> audio_file
-  { id: 'audio_file', label: '上传MP3文件', panelTitle: '上传音频文件', icon: FileAudio, color: 'fuchsia', description: '上传项目配音/解说MP3', x: 850, y: 300 },
+  // Audio Upload Node (Replaces Storyboard Text)
+  { id: 'audio_file', label: '上传音频', panelTitle: '上传音频文件 (MP3/WAV)', icon: FileAudio, color: 'fuchsia', description: '上传项目配音或解说文件', x: 850, y: 300 },
   { id: 'summary', label: '简介与标签', panelTitle: '视频简介与标签', icon: List, color: 'emerald', promptKey: 'SUMMARY', description: '生成简介和Hashtags', model: 'Gemini 2.5 Flash', x: 850, y: 500 },
   { id: 'cover', label: '封面策划', panelTitle: '封面视觉与文案策划', icon: Palette, color: 'rose', promptKey: 'COVER_GEN', description: '策划封面视觉与文案', model: 'Gemini 2.5 Flash', x: 850, y: 700 },
 ];
@@ -163,8 +161,7 @@ const ProjectWorkspace: React.FC = () => {
   const [project, setProject] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
   
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null); // Initialized to null for default collapsed state
-  // Changed to Set to allow concurrent generation indicators
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [generatingNodes, setGeneratingNodes] = useState<Set<string>>(new Set());
   const [failedNodes, setFailedNodes] = useState<Set<string>>(new Set());
   const [prompts, setPrompts] = useState<Record<string, PromptTemplate>>({});
@@ -183,20 +180,14 @@ const ProjectWorkspace: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'synced' | 'error' | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState('');
 
-  // To prevent async update on unmounted component
   const mountedRef = useRef(true);
-
-  // Activity Tracking Refs
   const lastActivityRef = useRef(Date.now());
   const isBusyRef = useRef(false);
 
-  // Update busy ref based on state
   useEffect(() => {
-      // Busy if loading, generating, dragging canvas, or user has a panel open (likely editing)
       isBusyRef.current = loading || generatingNodes.size > 0 || isDragging || selectedNodeId !== null || isUploading;
   }, [loading, generatingNodes, isDragging, selectedNodeId, isUploading]);
 
-  // Activity Listeners
   useEffect(() => {
     const updateActivity = () => { lastActivityRef.current = Date.now(); };
     window.addEventListener('click', updateActivity);
@@ -220,16 +211,14 @@ const ProjectWorkspace: React.FC = () => {
           
           if (isBusyRef.current || isUserActive) {
               console.log("Auto-sync delayed: User active or system busy");
-              timeoutId = setTimeout(performSync, 2 * 60 * 1000); // Retry in 2 mins
+              timeoutId = setTimeout(performSync, 2 * 60 * 1000); 
               return;
           }
 
           setSyncStatus('saving');
           try {
-              // Instead of heavy downloadAllData, just sync this specific project
               const remoteP = await storage.syncProject(id);
               if (remoteP && mountedRef.current) {
-                  // Only update if remote is newer
                   if (!project || remoteP.updatedAt > project.updatedAt) {
                       setProject(remoteP);
                   }
@@ -243,13 +232,10 @@ const ProjectWorkspace: React.FC = () => {
               if (mountedRef.current) setSyncStatus('error');
           }
 
-          // Schedule next run (5 mins)
           timeoutId = setTimeout(performSync, 5 * 60 * 1000);
       };
 
-      // Initial Delay
       timeoutId = setTimeout(performSync, 5 * 60 * 1000);
-
       return () => clearTimeout(timeoutId);
   }, [id, project]);
 
@@ -257,32 +243,23 @@ const ProjectWorkspace: React.FC = () => {
     mountedRef.current = true;
     const init = async () => {
         if (id) {
-            // 1. Local Load (Instant)
             const p = await storage.getProject(id);
             if (p) {
                 if (mountedRef.current) {
                     setProject(p);
-                    setLoading(false); // Unblock UI immediately
+                    setLoading(false);
                 }
-            } else {
-                // If local project not found, try fetching once from cloud before giving up
-                // But don't navigate away yet
             }
-
-            // 2. Cloud Sync (Background Pull - Single Project)
             if (mountedRef.current) setSyncStatus('saving');
             try {
-                // Use lightweight syncProject instead of heavy downloadAllData
                 const freshP = await storage.syncProject(id);
                 if (freshP && mountedRef.current) {
-                    // Update if we didn't have local data OR remote is newer
                     if (!p || freshP.updatedAt > p.updatedAt) {
                         setProject(freshP);
                     }
                     setSyncStatus('synced');
                     setLastSyncTime(new Date().toLocaleTimeString());
                 } else if (!p) {
-                    // No local, no remote -> 404
                     if (mountedRef.current) navigate('/');
                     return;
                 }
@@ -294,15 +271,12 @@ const ProjectWorkspace: React.FC = () => {
         
         const loadedPrompts = await storage.getPrompts();
         if (mountedRef.current) setPrompts(loadedPrompts);
-        
-        // Ensure loading is off if we haven't turned it off yet (e.g., waiting for remote only)
         if (mountedRef.current) setLoading(false);
     };
     init();
     return () => { mountedRef.current = false; };
   }, [id, navigate]);
 
-  // Canvas Interactions
   const handleWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
@@ -316,12 +290,7 @@ const ProjectWorkspace: React.FC = () => {
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
-      // Close sidebar if open when clicking on background
-      if (selectedNodeId) {
-          setSelectedNodeId(null);
-      }
-
-      // Allow drag on Space+Click OR Middle Click OR Left Click on empty space
+      if (selectedNodeId) setSelectedNodeId(null);
       if (e.button === 1 || e.button === 0) { 
           setIsDragging(true);
           dragStartRef.current = { x: e.clientX, y: e.clientY };
@@ -337,11 +306,8 @@ const ProjectWorkspace: React.FC = () => {
       }
   };
 
-  const handleCanvasMouseUp = () => {
-      setIsDragging(false);
-  };
+  const handleCanvasMouseUp = () => { setIsDragging(false); };
 
-  // Touch Handlers for Pad/Mobile
   const handleTouchStart = (e: React.TouchEvent) => {
       if (e.touches.length === 1) {
          if (selectedNodeId) setSelectedNodeId(null);
@@ -359,35 +325,24 @@ const ProjectWorkspace: React.FC = () => {
       }
   };
 
-  const handleTouchEnd = () => {
-      setIsDragging(false);
-  };
+  const handleTouchEnd = () => { setIsDragging(false); };
 
-  // Helper for score formatting
   const formatScore = (val: number | undefined) => {
     if (val === undefined || val === null) return '-';
     const num = Number(val);
-    // Backward compatibility: If score is on 100 scale (e.g. 85), divide by 10.
-    // If it's on 10 scale (e.g. 8.5), keep it.
-    if (num > 10) {
-        return (num / 10).toFixed(1);
-    }
+    if (num > 10) return (num / 10).toFixed(1);
     return num.toFixed(1);
   };
 
-  // Helper for prompt interpolation
   const interpolate = (template: string, data: Record<string, string>) => {
     return template.replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] || '');
   };
 
   const saveProjectUpdate = async (updater: (p: ProjectData) => ProjectData) => {
       if (!id) return;
-      // 1. Local Update
       const updated = await storage.updateProject(id, updater);
       if (updated && mountedRef.current) {
           setProject(updated);
-
-          // 2. Cloud Sync (Push)
           setSyncStatus('saving');
           try {
               await storage.uploadProjects();
@@ -406,18 +361,26 @@ const ProjectWorkspace: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file || !project) return;
     
+    // Safety check for file size > 100MB (Cloudflare Limit)
+    if (file.size > 100 * 1024 * 1024) {
+        alert(`文件太大 (${(file.size / 1024 / 1024).toFixed(2)}MB)。请上传小于 100MB 的文件。`);
+        return;
+    }
+
     setIsUploading(true);
     setSyncStatus('saving');
     try {
         const url = await storage.uploadFile(file, project.id);
         await saveProjectUpdate(p => ({ ...p, audioFile: url }));
         setSyncStatus('synced');
-    } catch(err) {
+    } catch(err: any) {
         console.error(err);
-        alert('音频上传失败');
+        alert(`音频上传失败: ${err.message || '未知错误'}`);
         setSyncStatus('error');
     } finally {
         if (mountedRef.current) setIsUploading(false);
+        // Clear input value to allow re-uploading the same file if needed
+        if (audioInputRef.current) audioInputRef.current.value = '';
     }
   };
 
@@ -429,8 +392,6 @@ const ProjectWorkspace: React.FC = () => {
       
       const template = prompts[config.promptKey]?.template || '';
       
-      // Prepare context data for interpolation
-      // Using current project state. For parallel execution, ensure dependencies (script) are present.
       const contextData: Record<string, string> = {
           topic: project.inputs.topic,
           tone: project.inputs.tone,
@@ -483,7 +444,6 @@ const ProjectWorkspace: React.FC = () => {
     if (!project) return;
     if (generatingNodes.has(nodeId)) return;
     
-    // Check dependencies
     if (['titles', 'summary', 'cover'].includes(nodeId) && !project.script) {
         alert("请先生成视频脚本 (Script)，然后再执行此步骤。");
         return;
@@ -519,10 +479,8 @@ const ProjectWorkspace: React.FC = () => {
           return;
       }
 
-      // Updated targets: removed 'sb_text'
       const targets = ['titles', 'summary', 'cover'];
       
-      // Mark all as generating
       setGeneratingNodes(prev => {
           const next = new Set(prev);
           targets.forEach(t => next.add(t));
@@ -530,7 +488,6 @@ const ProjectWorkspace: React.FC = () => {
       });
 
       const processWithRetry = async (id: string) => {
-          // Clear any previous failure
           setFailedNodes(prev => {
               const next = new Set(prev);
               next.delete(id);
@@ -541,13 +498,11 @@ const ProjectWorkspace: React.FC = () => {
               await generateNodeContent(id);
           } catch (error) {
               console.warn(`模块 [${id}] 第一次生成失败，正在重试...`, error);
-              // Simple wait before retry
               await new Promise(r => setTimeout(r, 1000));
               try {
                   await generateNodeContent(id);
               } catch (retryError: any) {
                   console.error(`模块 [${id}] 第二次生成失败`, retryError);
-                  // Mark as failed
                   setFailedNodes(prev => new Set(prev).add(id));
               }
           } finally {
@@ -561,11 +516,9 @@ const ProjectWorkspace: React.FC = () => {
           }
       };
 
-      // Execute in parallel
       await Promise.all(targets.map(id => processWithRetry(id)));
   };
 
-  // SVG Curve Calculator
   const getCurvePath = (start: {x:number, y:number}, end: {x:number, y:number}) => {
       const sx = start.x + NODE_WIDTH;
       const sy = start.y + NODE_HEIGHT / 2;
@@ -604,7 +557,6 @@ const ProjectWorkspace: React.FC = () => {
              </div>
 
              <div className="pointer-events-auto flex gap-3">
-                 {/* Sync Status Badge */}
                  <div className={`flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-md border animate-in fade-in transition-colors bg-white/90 backdrop-blur shadow-sm h-10 ${
                     syncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                     syncStatus === 'saving' ? 'bg-blue-50 text-blue-600 border-blue-100' :
@@ -632,9 +584,9 @@ const ProjectWorkspace: React.FC = () => {
                         onClick={handleOneClickStart}
                         disabled={generatingNodes.size > 0 || !project.script}
                         className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-violet-500/20 hover:shadow-violet-500/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
-                        title={!project.script ? "请先生成视频脚本" : "一键生成标题、分镜、简介与封面 (自动失败重试)"}
+                        title={!project.script ? "请先生成视频脚本" : "一键生成标题、简介与封面 (自动失败重试)"}
                     >
-                        {generatingNodes.size > 0 && ['titles', 'sb_text', 'summary', 'cover'].some(id => generatingNodes.has(id)) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
+                        {generatingNodes.size > 0 ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
                         一键启动
                     </button>
                  )}
@@ -705,11 +657,9 @@ const ProjectWorkspace: React.FC = () => {
                 {/* Nodes Layer */}
                 {NODES_CONFIG.map((node) => {
                      const isActive = selectedNodeId === node.id;
-                     // Check if this specific node is currently regenerating
                      const isGenerating = generatingNodes.has(node.id);
                      const isFailed = failedNodes.has(node.id);
                      
-                     // Determine status of data
                      let hasData = false;
                      if (node.id === 'input') hasData = !!project.inputs.topic;
                      if (node.id === 'script') hasData = !!project.script;
@@ -718,7 +668,6 @@ const ProjectWorkspace: React.FC = () => {
                      if (node.id === 'summary') hasData = !!project.summary;
                      if (node.id === 'cover') hasData = !!project.coverOptions && project.coverOptions.length > 0;
 
-                     // Visual Feedback Logic for Titles, Summary, Cover
                      let bgClass = 'bg-white';
                      if (['titles', 'audio_file', 'summary', 'cover'].includes(node.id)) {
                         if (hasData) {
@@ -743,17 +692,15 @@ const ProjectWorkspace: React.FC = () => {
                                 : 'border-slate-100 shadow-lg shadow-slate-200/50 hover:border-slate-300'
                             }`}
                             onMouseDown={(e) => {
-                                e.stopPropagation(); // Prevent canvas drag
+                                e.stopPropagation();
                                 setSelectedNodeId(node.id);
                             }}
                             onTouchStart={(e) => {
-                                e.stopPropagation(); // Prevent canvas drag on touch
+                                e.stopPropagation();
                                 setSelectedNodeId(node.id);
                             }}
                          >
-                             {/* Content Wrapper */}
                              <div className="p-5 h-full relative flex flex-col justify-between">
-                                {/* Header: Icon & Status */}
                                 <div className="flex items-start justify-between mb-2">
                                     <div className={`w-10 h-10 rounded-xl bg-${node.color}-100 text-${node.color}-600 flex items-center justify-center shadow-sm`}>
                                         <node.icon className="w-5 h-5" />
@@ -770,12 +717,10 @@ const ProjectWorkspace: React.FC = () => {
                                     )}
                                 </div>
                                 
-                                {/* Text Content */}
                                 <div className="pr-2 mb-8">
                                     <h3 className="text-base font-bold text-slate-800 mb-1">{node.label}</h3>
                                     <p className="text-[10px] text-slate-400 font-medium leading-snug line-clamp-2">{node.description}</p>
                                     
-                                    {/* ADD MODEL DISPLAY HERE */}
                                     {(node as any).model && (
                                         <div className="mt-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-50 border border-slate-100 text-[9px] font-mono text-slate-400">
                                             <Sparkles className="w-2.5 h-2.5 text-indigo-500" />
@@ -784,7 +729,6 @@ const ProjectWorkspace: React.FC = () => {
                                     )}
                                 </div>
 
-                                {/* Action Button - Positioned Bottom Right */}
                                 {node.id !== 'input' && !isArchived && node.id !== 'audio_file' && (
                                      <div className="absolute right-5 bottom-5">
                                         <button 
@@ -833,7 +777,6 @@ const ProjectWorkspace: React.FC = () => {
             className={`absolute top-0 right-0 bottom-0 bg-white/95 backdrop-blur-xl border-l border-slate-200 shadow-[-4px_0_24px_rgba(0,0,0,0.05)] transform transition-all duration-300 z-30 flex flex-col w-[480px] ${selectedNodeId ? 'translate-x-0' : 'translate-x-full'}`}
             onMouseDown={(e) => e.stopPropagation()}
         >
-            {/* Right Panel Header */}
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white/50 sticky top-0 z-20 backdrop-blur-md flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <button onClick={() => setSelectedNodeId(null)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors">
@@ -870,7 +813,6 @@ const ProjectWorkspace: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 bg-[#F8F9FC] flex flex-col">
-                 {/* Dynamic Content Based on Node */}
                  {selectedNodeId === 'input' && (
                      <div className="space-y-4 h-full">
                          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative group">
@@ -980,8 +922,13 @@ const ProjectWorkspace: React.FC = () => {
                         
                         {project.audioFile ? (
                             <div className="w-full space-y-6">
-                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                                    <FileAudio className="w-12 h-12 text-fuchsia-500 mx-auto mb-4" />
+                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col items-center">
+                                    <div className="w-16 h-16 bg-fuchsia-100 rounded-full flex items-center justify-center mb-4 text-fuchsia-600">
+                                        <Headphones className="w-8 h-8" />
+                                    </div>
+                                    <h4 className="text-sm font-bold text-slate-700 mb-4 truncate w-full">
+                                        {decodeURIComponent(project.audioFile.split('/').pop() || 'audio.mp3')}
+                                    </h4>
                                     <audio controls src={project.audioFile} className="w-full" />
                                 </div>
                                 <div className="flex gap-3 justify-center">
@@ -998,9 +945,9 @@ const ProjectWorkspace: React.FC = () => {
                                                  await saveProjectUpdate(p => ({ ...p, audioFile: undefined }));
                                              }
                                          }}
-                                         className="px-4 py-2 bg-white border border-rose-200 text-rose-500 rounded-xl font-bold hover:bg-rose-50 transition-colors text-sm"
+                                         className="px-4 py-2 bg-white border border-rose-200 text-rose-500 rounded-xl font-bold hover:bg-rose-50 transition-colors text-sm flex items-center gap-1"
                                     >
-                                        删除
+                                        <Trash2 className="w-3.5 h-3.5" /> 删除
                                     </button>
                                 </div>
                             </div>
@@ -1009,12 +956,12 @@ const ProjectWorkspace: React.FC = () => {
                                 className="w-full h-64 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center bg-slate-50/50 hover:bg-slate-50 transition-colors gap-4 cursor-pointer group"
                                 onClick={() => audioInputRef.current?.click()}
                             >
-                                 <div className="w-16 h-16 bg-fuchsia-50 text-fuchsia-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                                 <div className="w-16 h-16 bg-fuchsia-50 text-fuchsia-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
                                     <Upload className="w-8 h-8" />
                                  </div>
                                  <div>
                                      <h3 className="text-lg font-bold text-slate-700">点击上传音频文件</h3>
-                                     <p className="text-sm text-slate-400 mt-1">支持 MP3, WAV, M4A 等格式</p>
+                                     <p className="text-sm text-slate-400 mt-1">支持 MP3, WAV 等格式 (最大100MB)</p>
                                  </div>
                                  <button 
                                     onClick={(e) => { e.stopPropagation(); audioInputRef.current?.click(); }}
