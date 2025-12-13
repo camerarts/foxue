@@ -8,7 +8,7 @@ import {
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play, Pause,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2
 } from 'lucide-react';
 
 const RowCopyButton = ({ text }: { text: string }) => {
@@ -295,9 +295,6 @@ const ProjectWorkspace: React.FC = () => {
   
   const mountedRef = useRef(true);
 
-  // ... (Keeping logic same as previous, just updating render) ...
-  // Re-implementing simplified logic hooks for brevity in this response, focused on UI update
-  
   useEffect(() => {
     const init = async () => {
         if (id) {
@@ -334,14 +331,95 @@ const ProjectWorkspace: React.FC = () => {
       setIsUploading(false);
   };
 
-  const handleGenerate = async (nodeId: string) => {
-      // Mock generation for UI demo
-      if(!project) return;
-      setGeneratingNodes(prev => new Set(prev).add(nodeId));
-      setTimeout(async () => {
-          setGeneratingNodes(prev => { const n = new Set(prev); n.delete(nodeId); return n; });
-          // In real app, this calls Gemini
-      }, 2000);
+  const handleNodeAction = async (nodeId: string) => {
+    if (!project) return;
+    
+    // Audio is special - just open file dialog
+    if (nodeId === 'audio_file') {
+        audioInputRef.current?.click();
+        return;
+    }
+
+    // Check dependency: most nodes need Script first (except input and script itself)
+    if (['titles', 'summary', 'cover'].includes(nodeId) && !project.script) {
+        alert("请先生成视频脚本");
+        return;
+    }
+
+    setGeneratingNodes(prev => new Set(prev).add(nodeId));
+
+    try {
+        let update: Partial<ProjectData> = {};
+        const nodeConfig = NODES_CONFIG.find(n => n.id === nodeId);
+        if (!nodeConfig) return;
+
+        const promptKey = nodeConfig.promptKey;
+        const promptTemplate = promptKey ? prompts[promptKey]?.template : '';
+
+        if (!promptTemplate && nodeId !== 'script') {
+             throw new Error("Prompt template missing");
+        }
+
+        // Logic based on Node ID
+        if (nodeId === 'script') {
+             const inputPrompt = prompts['SCRIPT']?.template 
+                .replace('{{topic}}', project.inputs.topic || project.title)
+                .replace('{{tone}}', project.inputs.tone)
+                .replace('{{language}}', project.inputs.language) || '';
+            const text = await gemini.generateText(inputPrompt);
+            update = { script: text };
+        } else if (nodeId === 'titles') {
+             const p = promptTemplate
+                .replace('{{title}}', project.title)
+                .replace('{{script}}', project.script || '');
+             const data = await gemini.generateJSON<TitleItem[]>(p);
+             update = { titles: data };
+        } else if (nodeId === 'summary') {
+             const p = promptTemplate.replace('{{script}}', project.script || '');
+             const text = await gemini.generateText(p);
+             update = { summary: text };
+        } else if (nodeId === 'cover') {
+             const p = promptTemplate
+                .replace('{{title}}', project.title)
+                .replace('{{script}}', project.script || '');
+             const data = await gemini.generateJSON<CoverOption[]>(p);
+             update = { coverOptions: data };
+        }
+
+        const newProject = { ...project, ...update };
+        setProject(newProject);
+        await storage.saveProject(newProject);
+        
+    } catch (e: any) {
+        console.error(e);
+        alert(`生成失败: ${e.message}`);
+    } finally {
+        setGeneratingNodes(prev => { const n = new Set(prev); n.delete(nodeId); return n; });
+    }
+  };
+
+  const handleOneClickStart = async () => {
+    if (!project) return;
+    if (!project.script) {
+        alert("请先生成视频脚本，然后才能一键生成后续内容。");
+        return;
+    }
+
+    // Targets: Titles, Summary, Cover
+    const targets = [
+        { id: 'titles', hasData: !!project.titles && project.titles.length > 0 },
+        { id: 'summary', hasData: !!project.summary },
+        { id: 'cover', hasData: !!project.coverOptions && project.coverOptions.length > 0 }
+    ];
+
+    const toGenerate = targets.filter(t => !t.hasData);
+    if (toGenerate.length === 0) {
+        alert("所有板块均已生成，无需操作。");
+        return;
+    }
+
+    // Fire concurrently
+    toGenerate.forEach(t => handleNodeAction(t.id));
   };
 
   const getCurvePath = (start: {x:number, y:number}, end: {x:number, y:number}) => {
@@ -357,6 +435,20 @@ const ProjectWorkspace: React.FC = () => {
   return (
     <div className="flex h-full relative overflow-hidden bg-slate-50">
         
+        {/* Hidden Audio Input for Trigger */}
+        <input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileSelect} />
+
+        {/* Top Right "One Click" Button */}
+        <div className="absolute top-4 right-4 z-20">
+            <button
+                onClick={handleOneClickStart}
+                disabled={generatingNodes.size > 0}
+                className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2 text-sm disabled:opacity-50 disabled:transform-none disabled:shadow-none"
+            >
+                <Wand2 className="w-4 h-4" /> 一键生成
+            </button>
+        </div>
+
         {/* Canvas Area */}
         <div 
             ref={canvasRef}
@@ -371,6 +463,12 @@ const ProjectWorkspace: React.FC = () => {
                 }
             }}
             onMouseUp={() => setIsDragging(false)}
+            onClick={(e) => {
+                // Close sidebar if clicking blank canvas (and not dragging)
+                if (!isDragging) {
+                     setSelectedNodeId(null);
+                }
+            }}
             onWheel={(e) => {
                  if (e.ctrlKey) {
                     e.preventDefault();
@@ -422,6 +520,17 @@ const ProjectWorkspace: React.FC = () => {
                      if (node.id === 'summary') hasData = !!project.summary;
                      if (node.id === 'cover') hasData = !!project.coverOptions && project.coverOptions.length > 0;
 
+                     // Determine button label/icon based on node type
+                     let actionLabel = '生成';
+                     let ActionIcon = Sparkles;
+                     if (node.id === 'audio_file') {
+                         actionLabel = '上传';
+                         ActionIcon = Upload;
+                     } else if (hasData) {
+                         actionLabel = '重新生成';
+                         ActionIcon = RefreshCw;
+                     }
+
                      return (
                          <div 
                             key={node.id}
@@ -444,10 +553,10 @@ const ProjectWorkspace: React.FC = () => {
                                  {isActive && <div className={`w-2 h-2 rounded-full bg-${node.color}-500 animate-pulse`}></div>}
                              </div>
 
-                             <div className="p-5 flex flex-col justify-between flex-1">
-                                <p className="text-xs text-slate-500 font-medium leading-relaxed">{node.description}</p>
+                             <div className="p-5 flex flex-col justify-between flex-1 relative">
+                                <p className="text-xs text-slate-500 font-medium leading-relaxed mb-4">{node.description}</p>
                                 
-                                <div className="flex justify-end mt-auto">
+                                <div className="flex items-center justify-between mt-auto">
                                     <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
                                         hasData 
                                         ? 'bg-emerald-100 text-emerald-600 border-emerald-200' 
@@ -455,6 +564,27 @@ const ProjectWorkspace: React.FC = () => {
                                     }`}>
                                         {isGenerating ? '处理中...' : hasData ? '已完成' : '待处理'}
                                     </span>
+                                    
+                                    {/* Fixed Generate/Action Button */}
+                                    {node.id !== 'input' && (
+                                        <button 
+                                            onClick={(e) => { 
+                                                e.stopPropagation(); 
+                                                handleNodeAction(node.id);
+                                            }}
+                                            disabled={isGenerating}
+                                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                                                isGenerating 
+                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                : hasData 
+                                                    ? 'bg-white text-slate-600 border border-slate-200 hover:text-blue-600 hover:border-blue-200' 
+                                                    : `bg-${node.color}-500 hover:bg-${node.color}-600 text-white`
+                                            }`}
+                                        >
+                                            {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <ActionIcon className="w-3 h-3" />}
+                                            {isGenerating ? '处理中' : actionLabel}
+                                        </button>
+                                    )}
                                 </div>
                              </div>
                          </div>
@@ -480,6 +610,14 @@ const ProjectWorkspace: React.FC = () => {
 
             {/* Sidebar Content */}
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+                 {selectedNodeId === 'input' && (
+                     <TextResultBox 
+                        title="视频主题 (Project Input)" 
+                        content={project.inputs.topic || project.title} 
+                        readOnly={true}
+                    />
+                 )}
+
                  {selectedNodeId === 'audio_file' && (
                     <div className="flex flex-col h-full gap-4">
                         {/* Split View: Script Top */}
@@ -492,8 +630,6 @@ const ProjectWorkspace: React.FC = () => {
 
                         {/* Player Bottom */}
                         <div className="shrink-0">
-                            <input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileSelect} />
-                            
                             {(project.audioFile || pendingAudio) ? (
                                 <FancyAudioPlayer 
                                     src={pendingAudio ? pendingAudio.url : project.audioFile!}
