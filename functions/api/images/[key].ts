@@ -19,6 +19,7 @@ export const onRequestPut = async (context: any) => {
     const body = context.request.body; // Stream
     
     // Save with httpMetadata to ensure correct Content-Type on retrieval (e.g. audio/mpeg)
+    // Cloudflare Pages Functions R2 binding supports streaming the request body directly.
     await context.env.BUCKET.put(storageKey, body, {
         httpMetadata: { contentType: contentType }
     });
