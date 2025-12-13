@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
@@ -204,7 +205,11 @@ const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnl
     }
   };
 
-  const charCount = (value || '').length;
+  const calculateStats = (text: string) => {
+      const totalChars = text.length;
+      const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+      return `【共${totalChars}字符，共${chineseChars}个汉字】`;
+  };
 
   return (
     <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden flex flex-col h-full max-h-[600px]">
@@ -212,8 +217,8 @@ const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnl
         <div className="flex items-center gap-3">
              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">{title}</h4>
              {showStats && (
-                 <span className="text-[10px] text-slate-400 font-medium bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                    {charCount} 字
+                 <span className="text-[10px] text-slate-500 font-medium bg-white px-2 py-0.5 rounded border border-slate-200">
+                    {calculateStats(value)}
                  </span>
              )}
         </div>
@@ -228,13 +233,13 @@ const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnl
       </div>
       {onSave && !readOnly ? (
         <textarea 
-            className="flex-1 w-full p-4 text-sm text-slate-700 leading-relaxed outline-none resize-none bg-white focus:bg-slate-50/50 transition-colors"
+            className="flex-1 w-full p-4 text-sm text-slate-700 leading-relaxed outline-none resize-none bg-white focus:bg-slate-50/50 transition-colors font-mono"
             value={value}
             onChange={handleChange}
             placeholder={placeholder || "在此输入或生成内容..."}
         />
       ) : (
-        <div className="p-4 overflow-y-auto whitespace-pre-wrap text-sm text-slate-700 leading-relaxed flex-1">
+        <div className="p-4 overflow-y-auto whitespace-pre-wrap text-sm text-slate-700 leading-relaxed flex-1 font-mono">
           {content || <span className="text-slate-400 italic">暂无内容</span>}
         </div>
       )}
@@ -629,6 +634,7 @@ const ProjectWorkspace: React.FC = () => {
                         title="视频主题 (Project Input)" 
                         content={project.inputs.topic || project.title} 
                         readOnly={true}
+                        showStats={true}
                     />
                  )}
 
@@ -676,6 +682,7 @@ const ProjectWorkspace: React.FC = () => {
                         content={project.script || ''} 
                         placeholder="AI 将在此生成脚本..."
                         onSave={(val) => updateProjectField('script', val)} 
+                        showStats={true}
                     />
                  )}
 
@@ -716,6 +723,7 @@ const ProjectWorkspace: React.FC = () => {
                         content={project.summary || ''} 
                         placeholder="AI 将在此生成视频简介和标签..."
                         onSave={(val) => updateProjectField('summary', val)} 
+                        showStats={true}
                     />
                  )}
 
@@ -740,10 +748,29 @@ const ProjectWorkspace: React.FC = () => {
                                             <div>
                                                 <div className="flex justify-between items-center mb-1">
                                                     <span className="text-[10px] font-bold text-slate-400 uppercase block">封面文案</span>
-                                                    <RowCopyButton text={item.copy} />
+                                                    <RowCopyButton text={`${item.titleTop || item.copy || ''}\n${item.titleBottom || ''}`} />
                                                 </div>
-                                                <div className="text-sm font-black text-slate-800 bg-slate-900/5 p-3 rounded-lg border border-slate-200 whitespace-pre-wrap font-sans">
-                                                    {item.copy}
+                                                
+                                                {/* Rendering Main Title (Top) and Sub Title (Bottom) */}
+                                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                                    {/* Main Title - Prominent */}
+                                                    <div className="space-y-1">
+                                                        <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-1 rounded uppercase tracking-wider">主标题 (上行)</span>
+                                                        <div className="text-lg font-black text-slate-900 leading-tight">
+                                                            {item.titleTop || item.copy || '—'}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Divider */}
+                                                    <div className="border-t border-slate-200 border-dashed"></div>
+
+                                                    {/* Sub Title - Secondary */}
+                                                    <div className="space-y-1">
+                                                        <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1 rounded uppercase tracking-wider">副标题 (下行)</span>
+                                                        <div className="text-sm font-bold text-slate-600 leading-snug">
+                                                            {item.titleBottom || '—'}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
