@@ -28,7 +28,9 @@ export interface TitleItem {
 
 export interface CoverOption {
   visual: string; // Scene description
-  copy: string;   // Text on image
+  copy?: string;   // Legacy field
+  titleTop: string; // Main Title (Upper)
+  titleBottom: string; // Sub Title (Lower)
   score?: number; // Recommendation score
 }
 
@@ -191,21 +193,29 @@ export const DEFAULT_PROMPTS: Record<string, PromptTemplate> = {
 脚本内容:
 {{script}}
 
-请返回一个纯 JSON 数组（不要Markdown格式），数组中每个对象包含三个字段：
+**核心要求：**
+每个封面方案必须包含两行文字设计：
+1. **主标题 (titleTop)**：位于封面最显眼位置，字数少，冲击力强（如：痛点、核心利益、疑问）。
+2. **副标题 (titleBottom)**：作为补充说明或情绪引导，字体稍小（如：反差、结果、号召）。
+
+请返回一个纯 JSON 数组（不要Markdown格式），数组中每个对象包含以下字段：
 - "visual": 详细的画面描述（包含主体、表情、背景颜色、氛围）。
-- "copy": 封面上的文案（Copywriting）。**必须严格包含4行文字**（使用换行符分隔）。每行文字要简短有力，结构建议：第一行提出痛点/疑问，第二行否定常识/制造冲突，第三行给出颠覆性观点，第四行号召/强调（如【必看】）。
+- "titleTop": 封面上方的主标题文案。
+- "titleBottom": 封面下方的副标题文案。
 - "score": 推荐指数（1-100分）。
 
 示例：
 [
   {
     "visual": "极度震惊的表情特写，背景是燃烧的红色火焰", 
-    "copy": "學習要從基礎打起？\\n大錯特錯的舊觀念\\n高手都從頂層學起\\n【想考高分必看！】", 
+    "titleTop": "月薪三千怎么存钱？",
+    "titleBottom": "学会这招资产翻倍", 
     "score": 95
   },
   {
     "visual": "左右分屏对比...", 
-    "copy": "月薪三千怎么存钱？\\n別再只會省吃儉用\\n學會這招資產翻倍\\n【親測有效】", 
+    "titleTop": "大错特错的旧观念",
+    "titleBottom": "高手都从顶层学起", 
     "score": 88
   }
 ]
