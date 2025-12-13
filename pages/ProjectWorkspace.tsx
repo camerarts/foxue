@@ -8,7 +8,7 @@ import {
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload
 } from 'lucide-react';
 
 // --- Sub-Components ---
@@ -140,7 +140,7 @@ const NODES_CONFIG = [
   // Column 2: Outputs from Script
   { id: 'titles', label: '爆款标题', panelTitle: '爆款标题方案', icon: Type, color: 'amber', promptKey: 'TITLES', description: '生成高点击率标题', model: 'Gemini 2.5 Flash', x: 850, y: 100 },
   // Audio Upload Node (Replaces Storyboard Text)
-  { id: 'audio_file', label: '上传音频', panelTitle: '上传音频文件 (MP3/WAV)', icon: FileAudio, color: 'fuchsia', description: '上传项目配音或解说文件', x: 850, y: 300 },
+  { id: 'audio_file', label: '上传MP3文件', panelTitle: '上传音频文件 (MP3/WAV)', icon: FileAudio, color: 'fuchsia', description: '上传项目配音或解说文件', x: 850, y: 300 },
   { id: 'summary', label: '简介与标签', panelTitle: '视频简介与标签', icon: List, color: 'emerald', promptKey: 'SUMMARY', description: '生成简介和Hashtags', model: 'Gemini 2.5 Flash', x: 850, y: 500 },
   { id: 'cover', label: '封面策划', panelTitle: '封面视觉与文案策划', icon: Palette, color: 'rose', promptKey: 'COVER_GEN', description: '策划封面视觉与文案', model: 'Gemini 2.5 Flash', x: 850, y: 700 },
 ];
@@ -168,6 +168,8 @@ const ProjectWorkspace: React.FC = () => {
   
   // Audio Upload State
   const [isUploading, setIsUploading] = useState(false);
+  // Pending audio file (Selected but not uploaded)
+  const [pendingAudio, setPendingAudio] = useState<{file: File, url: string} | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
 
   // Canvas State
@@ -277,6 +279,15 @@ const ProjectWorkspace: React.FC = () => {
     return () => { mountedRef.current = false; };
   }, [id, navigate]);
 
+  // Clean up Blob URLs to avoid memory leaks
+  useEffect(() => {
+    return () => {
+        if (pendingAudio?.url) {
+            URL.revokeObjectURL(pendingAudio.url);
+        }
+    };
+  }, [pendingAudio]);
+
   const handleWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
@@ -357,31 +368,52 @@ const ProjectWorkspace: React.FC = () => {
       }
   };
 
-  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 1. Select File Handler (Local Preview)
+  const handleAudioFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !project) return;
+    if (!file) return;
     
-    // Safety check for file size > 100MB (Cloudflare Limit)
+    // Safety check for file size > 100MB
     if (file.size > 100 * 1024 * 1024) {
         alert(`文件太大 (${(file.size / 1024 / 1024).toFixed(2)}MB)。请上传小于 100MB 的文件。`);
         return;
     }
 
-    setIsUploading(true);
-    setSyncStatus('saving');
-    try {
-        const url = await storage.uploadFile(file, project.id);
-        await saveProjectUpdate(p => ({ ...p, audioFile: url }));
-        setSyncStatus('synced');
-    } catch(err: any) {
-        console.error(err);
-        alert(`音频上传失败: ${err.message || '未知错误'}`);
-        setSyncStatus('error');
-    } finally {
-        if (mountedRef.current) setIsUploading(false);
-        // Clear input value to allow re-uploading the same file if needed
-        if (audioInputRef.current) audioInputRef.current.value = '';
-    }
+    // Create local preview
+    if (pendingAudio?.url) URL.revokeObjectURL(pendingAudio.url);
+    const url = URL.createObjectURL(file);
+    setPendingAudio({ file, url });
+    
+    // Reset input to allow re-selection
+    if (audioInputRef.current) audioInputRef.current.value = '';
+  };
+
+  // 2. Real Upload Handler (Triggered by Button)
+  const executeAudioUpload = async () => {
+      if (!pendingAudio || !project) return;
+
+      setIsUploading(true);
+      setSyncStatus('saving');
+      try {
+          // Upload to R2
+          const cloudUrl = await storage.uploadFile(pendingAudio.file, project.id);
+          
+          // Save project with new URL
+          await saveProjectUpdate(p => ({ ...p, audioFile: cloudUrl }));
+          
+          // Cleanup local preview
+          URL.revokeObjectURL(pendingAudio.url);
+          setPendingAudio(null);
+          
+          setSyncStatus('synced');
+          alert('音频文件上传成功！');
+      } catch(err: any) {
+          console.error(err);
+          alert(`音频上传失败: ${err.message || '未知错误'}`);
+          setSyncStatus('error');
+      } finally {
+          if (mountedRef.current) setIsUploading(false);
+      }
   };
 
   const generateNodeContent = async (nodeId: string) => {
@@ -595,7 +627,7 @@ const ProjectWorkspace: React.FC = () => {
                     <button onClick={() => setTransform(prev => ({...prev, scale: prev.scale + 0.1}))} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-sm text-slate-600">
                         <ZoomIn className="w-5 h-5" />
                     </button>
-                    <button onClick={() => setTransform(prev => ({...prev, scale: Math.max(0.5, prev.scale - 0.1)}))} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-sm text-slate-600">
+                    <button onClick={() => setTransform(prev => ({...prev, scale: Math.max(0.5, prev.scale - 0.1}))} className="p-3 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-sm text-slate-600">
                         <ZoomOut className="w-5 h-5" />
                     </button>
                  </div>
@@ -663,7 +695,7 @@ const ProjectWorkspace: React.FC = () => {
                      let hasData = false;
                      if (node.id === 'input') hasData = !!project.inputs.topic;
                      if (node.id === 'script') hasData = !!project.script;
-                     if (node.id === 'audio_file') hasData = !!project.audioFile;
+                     if (node.id === 'audio_file') hasData = !!project.audioFile || !!pendingAudio; // Show active if local or remote
                      if (node.id === 'titles') hasData = !!project.titles && project.titles.length > 0;
                      if (node.id === 'summary') hasData = !!project.summary;
                      if (node.id === 'cover') hasData = !!project.coverOptions && project.coverOptions.length > 0;
@@ -755,8 +787,8 @@ const ProjectWorkspace: React.FC = () => {
                                                 : `bg-${node.color}-50 text-${node.color}-600 hover:bg-${node.color}-100 border border-${node.color}-100 hover:shadow-md`
                                             }`}
                                         >
-                                            {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-                                            {isUploading ? '上传中...' : (hasData ? '重新上传' : '上传音频')}
+                                            <Upload className="w-3 h-3" />
+                                            {hasData ? (pendingAudio ? '等待上传' : '已上传') : '选择音频'}
                                         </button>
                                     </div>
                                 )}
@@ -809,6 +841,17 @@ const ProjectWorkspace: React.FC = () => {
                             )
                          );
                      })()}
+                     {/* Specific Button for Audio File Upload */}
+                     {selectedNodeId === 'audio_file' && pendingAudio && !isArchived && (
+                        <button 
+                             onClick={executeAudioUpload}
+                             disabled={isUploading}
+                             className="px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all bg-fuchsia-600 text-white hover:bg-fuchsia-700 shadow-md hover:shadow-lg disabled:opacity-50"
+                        >
+                             {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CloudUpload className="w-3 h-3" />}
+                             {isUploading ? '上传中...' : '上传到云端'}
+                        </button>
+                     )}
                 </div>
             </div>
 
@@ -917,19 +960,42 @@ const ProjectWorkspace: React.FC = () => {
                             ref={audioInputRef} 
                             accept="audio/*" 
                             className="hidden" 
-                            onChange={handleAudioUpload}
+                            onChange={handleAudioFileSelect}
                         />
                         
-                        {project.audioFile ? (
+                        {/* Status Indicator for Pending Upload */}
+                        {pendingAudio && (
+                             <div className="w-full mb-4 animate-in fade-in slide-in-from-top-2">
+                                 <div className="bg-fuchsia-50 text-fuchsia-700 p-3 rounded-xl border border-fuchsia-200 flex items-center justify-between text-xs font-bold">
+                                     <div className="flex items-center gap-2">
+                                         <AlertCircle className="w-4 h-4" />
+                                         <span>文件已选择，请点击右上角上传到云端</span>
+                                     </div>
+                                 </div>
+                             </div>
+                        )}
+
+                        {(project.audioFile || pendingAudio) ? (
                             <div className="w-full space-y-6">
                                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col items-center">
-                                    <div className="w-16 h-16 bg-fuchsia-100 rounded-full flex items-center justify-center mb-4 text-fuchsia-600">
+                                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors ${pendingAudio ? 'bg-fuchsia-100 text-fuchsia-600' : 'bg-emerald-100 text-emerald-600'}`}>
                                         <Headphones className="w-8 h-8" />
                                     </div>
-                                    <h4 className="text-sm font-bold text-slate-700 mb-4 truncate w-full">
-                                        {decodeURIComponent(project.audioFile.split('/').pop() || 'audio.mp3')}
+                                    <h4 className="text-sm font-bold text-slate-700 mb-2 truncate w-full">
+                                        {pendingAudio ? pendingAudio.file.name : decodeURIComponent(project.audioFile!.split('/').pop() || 'audio.mp3')}
                                     </h4>
-                                    <audio controls src={project.audioFile} className="w-full" />
+                                    
+                                    {pendingAudio ? (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-fuchsia-100 text-fuchsia-600 rounded mb-4">
+                                            本地预览模式 (未保存)
+                                        </span>
+                                    ) : (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded mb-4 flex items-center gap-1">
+                                            <CheckCircle2 className="w-3 h-3" /> 已保存至云端
+                                        </span>
+                                    )}
+
+                                    <audio controls src={pendingAudio ? pendingAudio.url : project.audioFile} className="w-full" />
                                 </div>
                                 <div className="flex gap-3 justify-center">
                                     <button 
@@ -939,16 +1005,18 @@ const ProjectWorkspace: React.FC = () => {
                                     >
                                         更换文件
                                     </button>
-                                    <button 
-                                         onClick={async () => {
-                                             if(confirm('确定要删除此音频文件吗？')) {
-                                                 await saveProjectUpdate(p => ({ ...p, audioFile: undefined }));
-                                             }
-                                         }}
-                                         className="px-4 py-2 bg-white border border-rose-200 text-rose-500 rounded-xl font-bold hover:bg-rose-50 transition-colors text-sm flex items-center gap-1"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" /> 删除
-                                    </button>
+                                    {!pendingAudio && (
+                                        <button 
+                                             onClick={async () => {
+                                                 if(confirm('确定要删除此音频文件吗？')) {
+                                                     await saveProjectUpdate(p => ({ ...p, audioFile: undefined }));
+                                                 }
+                                             }}
+                                             className="px-4 py-2 bg-white border border-rose-200 text-rose-500 rounded-xl font-bold hover:bg-rose-50 transition-colors text-sm flex items-center gap-1"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" /> 删除
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ) : (
@@ -960,7 +1028,7 @@ const ProjectWorkspace: React.FC = () => {
                                     <Upload className="w-8 h-8" />
                                  </div>
                                  <div>
-                                     <h3 className="text-lg font-bold text-slate-700">点击上传音频文件</h3>
+                                     <h3 className="text-lg font-bold text-slate-700">点击选择音频文件</h3>
                                      <p className="text-sm text-slate-400 mt-1">支持 MP3, WAV 等格式 (最大100MB)</p>
                                  </div>
                                  <button 
@@ -968,8 +1036,8 @@ const ProjectWorkspace: React.FC = () => {
                                     disabled={isUploading}
                                     className="px-6 py-2.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-xl font-bold shadow-lg shadow-fuchsia-500/30 transition-all flex items-center gap-2 text-sm"
                                  >
-                                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                                    {isUploading ? '上传中...' : '选择文件'}
+                                    <Upload className="w-4 h-4" />
+                                    选择文件
                                  </button>
                             </div>
                         )}
