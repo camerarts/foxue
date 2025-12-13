@@ -168,6 +168,7 @@ const ProjectWorkspace: React.FC = () => {
   
   // Audio Upload State
   const [isUploading, setIsUploading] = useState(false);
+  const [audioUploadProgress, setAudioUploadProgress] = useState(0);
   // Pending audio file (Selected but not uploaded)
   const [pendingAudio, setPendingAudio] = useState<{file: File, url: string} | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -393,10 +394,13 @@ const ProjectWorkspace: React.FC = () => {
       if (!pendingAudio || !project) return;
 
       setIsUploading(true);
+      setAudioUploadProgress(0);
       setSyncStatus('saving');
       try {
-          // Upload to R2
-          const cloudUrl = await storage.uploadFile(pendingAudio.file, project.id);
+          // Upload to R2 with progress callback
+          const cloudUrl = await storage.uploadFile(pendingAudio.file, project.id, (percent) => {
+              setAudioUploadProgress(percent);
+          });
           
           // Save project with new URL
           await saveProjectUpdate(p => ({ ...p, audioFile: cloudUrl }));
@@ -412,7 +416,10 @@ const ProjectWorkspace: React.FC = () => {
           alert(`音频上传失败: ${err.message || '未知错误'}`);
           setSyncStatus('error');
       } finally {
-          if (mountedRef.current) setIsUploading(false);
+          if (mountedRef.current) {
+              setIsUploading(false);
+              setAudioUploadProgress(0);
+          }
       }
   };
 
@@ -849,7 +856,7 @@ const ProjectWorkspace: React.FC = () => {
                              className="px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all bg-fuchsia-600 text-white hover:bg-fuchsia-700 shadow-md hover:shadow-lg disabled:opacity-50"
                         >
                              {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CloudUpload className="w-3 h-3" />}
-                             {isUploading ? '上传中...' : '上传到云端'}
+                             {isUploading ? `${Math.round(audioUploadProgress)}%` : '上传到云端'}
                         </button>
                      )}
                 </div>
@@ -993,6 +1000,22 @@ const ProjectWorkspace: React.FC = () => {
                                         <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded mb-4 flex items-center gap-1">
                                             <CheckCircle2 className="w-3 h-3" /> 已保存至云端
                                         </span>
+                                    )}
+
+                                    {/* Progress Bar Injection */}
+                                    {isUploading && (
+                                        <div className="w-full mb-4 space-y-1">
+                                            <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                                                <span>正在上传...</span>
+                                                <span>{Math.round(audioUploadProgress)}%</span>
+                                            </div>
+                                            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-fuchsia-500 transition-all duration-300" 
+                                                    style={{ width: `${audioUploadProgress}%` }}
+                                                />
+                                            </div>
+                                        </div>
                                     )}
 
                                     <audio controls src={pendingAudio ? pendingAudio.url : project.audioFile} className="w-full" />
