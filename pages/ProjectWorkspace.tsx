@@ -9,7 +9,7 @@ import {
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play, Pause,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2, Download, Music4
 } from 'lucide-react';
 
 const RowCopyButton = ({ text }: { text: string }) => {
@@ -27,7 +27,7 @@ const RowCopyButton = ({ text }: { text: string }) => {
   );
 };
 
-// --- Clean Modern Audio Player ---
+// --- Clean Modern Audio Player (Redesigned) ---
 const FancyAudioPlayer = ({ 
     src, 
     fileName, 
@@ -86,6 +86,15 @@ const FancyAudioPlayer = ({
         setProgress(Number(e.target.value));
     };
 
+    const handleDownload = () => {
+        const a = document.createElement('a');
+        a.href = src;
+        a.download = fileName || 'audio.mp3';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
     const formatTime = (time: number) => {
         if (isNaN(time)) return "00:00";
         const minutes = Math.floor(time / 60);
@@ -94,78 +103,126 @@ const FancyAudioPlayer = ({
     };
 
     return (
-        <div className="w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-             <div className="flex items-center gap-3 mb-3">
-                 <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
-                     <FileAudio className="w-5 h-5 text-slate-500" />
-                 </div>
-                 <div className="flex-1 min-w-0">
-                     <h4 className="text-sm font-bold text-slate-800 truncate" title={fileName}>{fileName}</h4>
-                     <div className="flex items-center gap-2">
-                        {isLocal ? (
-                            <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">待上传</span>
-                        ) : (
-                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">云端文件</span>
-                        )}
-                        <span className="text-xs text-slate-400 font-mono">{formatTime(currentTime)} / {formatTime(duration)}</span>
-                     </div>
-                 </div>
-             </div>
-
+        <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
              <audio ref={audioRef} src={src} preload="metadata" />
 
-             {/* Progress Bar */}
-             <div className="relative w-full h-1.5 bg-slate-100 rounded-full mb-4 cursor-pointer group">
-                  <div 
-                     className="absolute top-0 left-0 h-full bg-slate-800 rounded-full transition-all" 
-                     style={{ width: `${progress}%` }}
-                 />
-                  <input 
-                     type="range" 
-                     min="0" 
-                     max="100" 
-                     value={progress} 
-                     onChange={handleSeek}
-                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                 />
+             {/* Top Info Section */}
+             <div className="flex items-start justify-between mb-6">
+                 <div className="flex items-center gap-4">
+                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${isPlaying ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-400'}`}>
+                         <Music4 className={`w-7 h-7 ${isPlaying ? 'animate-pulse' : ''}`} />
+                     </div>
+                     <div>
+                         <h4 className="text-base font-bold text-slate-800 line-clamp-1" title={fileName}>
+                             {fileName}
+                         </h4>
+                         <div className="flex items-center gap-2 mt-1">
+                            {isLocal ? (
+                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">待上传</span>
+                            ) : (
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">云端存储</span>
+                            )}
+                            <span className="text-xs text-slate-400 font-medium tracking-wide">MP3 Audio</span>
+                         </div>
+                     </div>
+                 </div>
+                 
+                 {/* Visualizer Bars (Simulated) */}
+                 <div className="hidden sm:flex items-center gap-0.5 h-8">
+                    {[...Array(12)].map((_, i) => (
+                        <div 
+                            key={i} 
+                            className={`w-1 bg-indigo-500 rounded-full transition-all duration-300 ${isPlaying ? 'animate-music-bar' : 'h-1 opacity-20'}`}
+                            style={{ 
+                                height: isPlaying ? `${Math.random() * 100}%` : '4px',
+                                animationDelay: `${i * 0.1}s` 
+                            }} 
+                        />
+                    ))}
+                 </div>
              </div>
 
-             <div className="flex items-center justify-between">
-                 <div className="flex gap-2">
-                     <button 
-                         onClick={togglePlay}
-                         className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-700 transition-colors shadow-sm"
-                     >
-                         {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
-                     </button>
+             {/* Progress Section */}
+             <div className="mb-6">
+                 <div className="relative w-full h-2 bg-slate-100 rounded-full cursor-pointer group mb-2">
+                      <div 
+                         className="absolute top-0 left-0 h-full bg-indigo-600 rounded-full transition-all group-hover:bg-indigo-500" 
+                         style={{ width: `${progress}%` }}
+                     />
+                      {/* Thumb */}
+                      <div 
+                         className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-indigo-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                         style={{ left: `${progress}%`, marginLeft: '-6px' }}
+                      />
+                      <input 
+                         type="range" 
+                         min="0" 
+                         max="100" 
+                         value={progress} 
+                         onChange={handleSeek}
+                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                     />
                  </div>
+                 <div className="flex justify-between text-xs font-bold text-slate-400 font-mono">
+                     <span>{formatTime(currentTime)}</span>
+                     <span>{formatTime(duration)}</span>
+                 </div>
+             </div>
 
-                 <div className="flex gap-2">
-                     <button onClick={onReplace} className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200">
-                         替换文件
+             {/* Controls & Actions */}
+             <div className="flex items-center justify-between">
+                 
+                 {/* Play Button */}
+                 <button 
+                     onClick={togglePlay}
+                     className="w-14 h-14 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-indigo-600 hover:scale-105 transition-all shadow-lg shadow-slate-900/20 active:scale-95"
+                 >
+                     {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-1" />}
+                 </button>
+
+                 {/* Actions Toolbar */}
+                 <div className="flex items-center gap-1 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                     <button 
+                        onClick={handleDownload} 
+                        className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"
+                        title="下载音频"
+                     >
+                         <Download className="w-4 h-4" />
+                     </button>
+                     <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                     <button 
+                        onClick={onReplace} 
+                        className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"
+                        title="替换文件"
+                     >
+                         <RefreshCw className="w-4 h-4" />
                      </button>
                      {onDelete && (
-                         <button onClick={onDelete} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                         <button 
+                            onClick={onDelete} 
+                            className="p-2.5 text-slate-500 hover:text-rose-500 hover:bg-white rounded-lg transition-all"
+                            title="删除"
+                         >
                               <Trash2 className="w-4 h-4" />
                          </button>
                      )}
                  </div>
              </div>
 
-             {/* Upload Action */}
+             {/* Upload Action (Only Local) */}
              {isLocal && (
-                 <div className="mt-4 pt-3 border-t border-slate-100">
+                 <div className="mt-6 pt-5 border-t border-slate-100 animate-in slide-in-from-top-2">
                       {isUploading ? (
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-4">
                               <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                  <div className="h-full bg-blue-500 rounded-full transition-all" style={{width: `${uploadProgress}%`}}></div>
+                                  <div className="h-full bg-indigo-500 rounded-full transition-all duration-300" style={{width: `${uploadProgress}%`}}></div>
                               </div>
-                              <span className="text-xs font-bold text-blue-600">{Math.round(uploadProgress || 0)}%</span>
+                              <span className="text-xs font-bold text-indigo-600 w-10 text-right">{Math.round(uploadProgress || 0)}%</span>
                           </div>
                       ) : (
                           <button 
                              onClick={onUpload}
-                             className="w-full py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center gap-2"
+                             className="w-full py-3 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-sm font-bold rounded-xl hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 active:scale-[0.99]"
                           >
                              <CloudUpload className="w-4 h-4" /> 上传到云端
                           </button>
