@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
@@ -8,7 +10,7 @@ import {
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload
 } from 'lucide-react';
 
 // --- Sub-Components ---
@@ -139,14 +141,15 @@ const NODES_CONFIG = [
   { id: 'script', label: '视频脚本', panelTitle: '视频文案脚本编辑器', icon: FileText, color: 'violet', promptKey: 'SCRIPT', description: '生成分章节的详细脚本', model: 'Gemini 2.5 Flash Preview', x: 450, y: 300 },
   // Column 2: Outputs from Script
   { id: 'titles', label: '爆款标题', panelTitle: '爆款标题方案', icon: Type, color: 'amber', promptKey: 'TITLES', description: '生成高点击率标题', model: 'Gemini 2.5 Flash', x: 850, y: 100 },
-  { id: 'sb_text', label: '分镜文案', panelTitle: '分镜画面描述', icon: Film, color: 'fuchsia', promptKey: 'STORYBOARD_TEXT', description: '拆解为可视化画面描述', model: 'Gemini 2.5 Flash', x: 850, y: 300 },
+  // Changed Node: sb_text -> audio_file
+  { id: 'audio_file', label: '上传MP3文件', panelTitle: '上传音频文件', icon: FileAudio, color: 'fuchsia', description: '上传项目配音/解说MP3', x: 850, y: 300 },
   { id: 'summary', label: '简介与标签', panelTitle: '视频简介与标签', icon: List, color: 'emerald', promptKey: 'SUMMARY', description: '生成简介和Hashtags', model: 'Gemini 2.5 Flash', x: 850, y: 500 },
   { id: 'cover', label: '封面策划', panelTitle: '封面视觉与文案策划', icon: Palette, color: 'rose', promptKey: 'COVER_GEN', description: '策划封面视觉与文案', model: 'Gemini 2.5 Flash', x: 850, y: 700 },
 ];
 
 const CONNECTIONS = [
   { from: 'input', to: 'script' },
-  { from: 'script', to: 'sb_text' },
+  { from: 'script', to: 'audio_file' },
   { from: 'script', to: 'titles' },
   { from: 'script', to: 'summary' },
   { from: 'script', to: 'cover' },
@@ -166,6 +169,10 @@ const ProjectWorkspace: React.FC = () => {
   const [failedNodes, setFailedNodes] = useState<Set<string>>(new Set());
   const [prompts, setPrompts] = useState<Record<string, PromptTemplate>>({});
   
+  // Audio Upload State
+  const [isUploading, setIsUploading] = useState(false);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+
   // Canvas State
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
@@ -186,8 +193,8 @@ const ProjectWorkspace: React.FC = () => {
   // Update busy ref based on state
   useEffect(() => {
       // Busy if loading, generating, dragging canvas, or user has a panel open (likely editing)
-      isBusyRef.current = loading || generatingNodes.size > 0 || isDragging || selectedNodeId !== null;
-  }, [loading, generatingNodes, isDragging, selectedNodeId]);
+      isBusyRef.current = loading || generatingNodes.size > 0 || isDragging || selectedNodeId !== null || isUploading;
+  }, [loading, generatingNodes, isDragging, selectedNodeId, isUploading]);
 
   // Activity Listeners
   useEffect(() => {
@@ -395,17 +402,23 @@ const ProjectWorkspace: React.FC = () => {
       }
   };
 
-  const handleSwapContent = async () => {
-        if (!project || !project.storyboard) return;
-        if (!window.confirm("确定要对调【原文】和【画面描述】的内容吗？")) return;
-        
-        const updatedStoryboard = project.storyboard.map(f => ({
-            ...f,
-            originalText: f.description,
-            description: f.originalText || ''
-        }));
-        
-        await saveProjectUpdate(p => ({ ...p, storyboard: updatedStoryboard }));
+  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !project) return;
+    
+    setIsUploading(true);
+    setSyncStatus('saving');
+    try {
+        const url = await storage.uploadFile(file, project.id);
+        await saveProjectUpdate(p => ({ ...p, audioFile: url }));
+        setSyncStatus('synced');
+    } catch(err) {
+        console.error(err);
+        alert('音频上传失败');
+        setSyncStatus('error');
+    } finally {
+        if (mountedRef.current) setIsUploading(false);
+    }
   };
 
   const generateNodeContent = async (nodeId: string) => {
@@ -464,29 +477,6 @@ const ProjectWorkspace: React.FC = () => {
           });
           await saveProjectUpdate(p => ({ ...p, coverOptions: data }));
       }
-      else if (nodeId === 'sb_text') {
-          const data = await gemini.generateJSON<{original: string, description: string}[]>(prompt, {
-              type: "ARRAY", items: {
-                  type: "OBJECT", properties: {
-                      original: {type: "STRING"},
-                      description: {type: "STRING"}
-                  }
-              }
-          });
-          
-          // Map extracted JSON to StoryboardFrame structure
-          // Ensure correct mapping based on the prompt instructions:
-          // 'original' -> originalText (Script content)
-          // 'description' -> description (Visual description)
-          const frames: StoryboardFrame[] = data.map((item, idx) => ({
-              id: crypto.randomUUID(),
-              sceneNumber: idx + 1,
-              originalText: item.original,
-              description: item.description,
-              imagePrompt: item.description // Fix: Auto-fill imagePrompt with description
-          }));
-          await saveProjectUpdate(p => ({ ...p, storyboard: frames }));
-      }
   };
 
   const handleGenerate = async (nodeId: string) => {
@@ -494,7 +484,7 @@ const ProjectWorkspace: React.FC = () => {
     if (generatingNodes.has(nodeId)) return;
     
     // Check dependencies
-    if (['sb_text', 'titles', 'summary', 'cover'].includes(nodeId) && !project.script) {
+    if (['titles', 'summary', 'cover'].includes(nodeId) && !project.script) {
         alert("请先生成视频脚本 (Script)，然后再执行此步骤。");
         return;
     }
@@ -529,7 +519,8 @@ const ProjectWorkspace: React.FC = () => {
           return;
       }
 
-      const targets = ['titles', 'sb_text', 'summary', 'cover'];
+      // Updated targets: removed 'sb_text'
+      const targets = ['titles', 'summary', 'cover'];
       
       // Mark all as generating
       setGeneratingNodes(prev => {
@@ -722,14 +713,14 @@ const ProjectWorkspace: React.FC = () => {
                      let hasData = false;
                      if (node.id === 'input') hasData = !!project.inputs.topic;
                      if (node.id === 'script') hasData = !!project.script;
-                     if (node.id === 'sb_text') hasData = !!project.storyboard && project.storyboard.length > 0;
+                     if (node.id === 'audio_file') hasData = !!project.audioFile;
                      if (node.id === 'titles') hasData = !!project.titles && project.titles.length > 0;
                      if (node.id === 'summary') hasData = !!project.summary;
                      if (node.id === 'cover') hasData = !!project.coverOptions && project.coverOptions.length > 0;
 
-                     // Visual Feedback Logic for Titles, Storyboard, Summary, Cover
+                     // Visual Feedback Logic for Titles, Summary, Cover
                      let bgClass = 'bg-white';
-                     if (['titles', 'sb_text', 'summary', 'cover'].includes(node.id)) {
+                     if (['titles', 'audio_file', 'summary', 'cover'].includes(node.id)) {
                         if (hasData) {
                             bgClass = 'bg-emerald-50';
                         } else if (isFailed) {
@@ -794,7 +785,7 @@ const ProjectWorkspace: React.FC = () => {
                                 </div>
 
                                 {/* Action Button - Positioned Bottom Right */}
-                                {node.id !== 'input' && !isArchived && (
+                                {node.id !== 'input' && !isArchived && node.id !== 'audio_file' && (
                                      <div className="absolute right-5 bottom-5">
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); handleGenerate(node.id); }}
@@ -809,6 +800,21 @@ const ProjectWorkspace: React.FC = () => {
                                             {isGenerating ? '生成中...' : (hasData ? '重新生成' : (isFailed ? '重试生成' : '开始生成'))}
                                         </button>
                                      </div>
+                                )}
+                                {node.id === 'audio_file' && !isArchived && (
+                                    <div className="absolute right-5 bottom-5">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                                                hasData 
+                                                ? 'bg-white border border-slate-200 text-slate-500 hover:text-violet-600 hover:border-violet-200 hover:shadow-md' 
+                                                : `bg-${node.color}-50 text-${node.color}-600 hover:bg-${node.color}-100 border border-${node.color}-100 hover:shadow-md`
+                                            }`}
+                                        >
+                                            {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                                            {isUploading ? '上传中...' : (hasData ? '重新上传' : '上传音频')}
+                                        </button>
+                                    </div>
                                 )}
                                 {node.id === 'input' && (
                                      <span className="absolute right-5 bottom-5 text-[10px] font-bold text-slate-400 px-2 py-1 bg-slate-50 rounded-md border border-slate-100">
@@ -850,7 +856,7 @@ const ProjectWorkspace: React.FC = () => {
                      {selectedNodeId && !isArchived && (() => {
                          const node = NODES_CONFIG.find(n => n.id === selectedNodeId);
                          return (
-                            node?.id !== 'input' && (
+                            node?.id !== 'input' && node?.id !== 'audio_file' && (
                                 <button 
                                     onClick={() => handleGenerate(selectedNodeId!)}
                                     className={`px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all bg-${node?.color}-50 text-${node?.color}-600 hover:bg-${node?.color}-100 shadow-sm border border-${node?.color}-100`}
@@ -962,59 +968,65 @@ const ProjectWorkspace: React.FC = () => {
                      </div>
                  )}
 
-                 {selectedNodeId === 'sb_text' && (
-                     <div className="flex flex-col h-full">
-                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between flex-shrink-0 -mx-6 -mt-6 mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-pink-100 text-pink-600 rounded-lg">
-                                    <Images className="w-4 h-4" />
+                 {selectedNodeId === 'audio_file' && (
+                    <div className="flex flex-col h-full items-center justify-center p-6 text-center">
+                        <input 
+                            type="file" 
+                            ref={audioInputRef} 
+                            accept="audio/*" 
+                            className="hidden" 
+                            onChange={handleAudioUpload}
+                        />
+                        
+                        {project.audioFile ? (
+                            <div className="w-full space-y-6">
+                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                                    <FileAudio className="w-12 h-12 text-fuchsia-500 mx-auto mb-4" />
+                                    <audio controls src={project.audioFile} className="w-full" />
                                 </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-slate-800">AI 图片生成</h3>
-                                    <p className="text-[10px] text-slate-400">基于当前分镜列表批量生图</p>
+                                <div className="flex gap-3 justify-center">
+                                    <button 
+                                        onClick={() => audioInputRef.current?.click()}
+                                        className="px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors text-sm"
+                                        disabled={isUploading}
+                                    >
+                                        更换文件
+                                    </button>
+                                    <button 
+                                         onClick={async () => {
+                                             if(confirm('确定要删除此音频文件吗？')) {
+                                                 await saveProjectUpdate(p => ({ ...p, audioFile: undefined }));
+                                             }
+                                         }}
+                                         className="px-4 py-2 bg-white border border-rose-200 text-rose-500 rounded-xl font-bold hover:bg-rose-50 transition-colors text-sm"
+                                    >
+                                        删除
+                                    </button>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={handleSwapContent}
-                                    className="bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-lg font-bold hover:bg-slate-50 transition-all flex items-center gap-2 text-xs shadow-sm"
-                                    title="对调原文和画面描述"
-                                >
-                                    <ArrowLeftRight className="w-3.5 h-3.5" /> 调换
-                                </button>
-                                <button
-                                    onClick={() => navigate(`/project/${project.id}/images`)}
-                                    className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg shadow-slate-900/20 text-xs"
-                                >
-                                    前往工坊 <ArrowRight className="w-3 h-3" />
-                                </button>
+                        ) : (
+                            <div 
+                                className="w-full h-64 border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center bg-slate-50/50 hover:bg-slate-50 transition-colors gap-4 cursor-pointer group"
+                                onClick={() => audioInputRef.current?.click()}
+                            >
+                                 <div className="w-16 h-16 bg-fuchsia-50 text-fuchsia-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <Upload className="w-8 h-8" />
+                                 </div>
+                                 <div>
+                                     <h3 className="text-lg font-bold text-slate-700">点击上传音频文件</h3>
+                                     <p className="text-sm text-slate-400 mt-1">支持 MP3, WAV, M4A 等格式</p>
+                                 </div>
+                                 <button 
+                                    onClick={(e) => { e.stopPropagation(); audioInputRef.current?.click(); }}
+                                    disabled={isUploading}
+                                    className="px-6 py-2.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-xl font-bold shadow-lg shadow-fuchsia-500/30 transition-all flex items-center gap-2 text-sm"
+                                 >
+                                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                    {isUploading ? '上传中...' : '选择文件'}
+                                 </button>
                             </div>
-                        </div>
-                        <div className="flex-1 overflow-y-auto">
-                             <TableResultBox 
-                                headers={['#', '原文', '画面描述', '']}
-                                data={project.storyboard || []}
-                                renderRow={(item: StoryboardFrame, i: number) => (
-                                    <tr key={item.id} className="hover:bg-slate-50 group">
-                                        <td className="py-4 px-5 text-center text-xs font-bold text-slate-400 align-top">{item.sceneNumber}</td>
-                                        <td className="py-4 px-5 align-top max-w-[150px]">
-                                            <div className="text-xs text-slate-500 leading-relaxed whitespace-pre-wrap line-clamp-5">
-                                                {item.originalText}
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-5 align-top">
-                                            <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap line-clamp-5">
-                                                {item.description}
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-5 text-right align-top">
-                                             <RowCopyButton text={item.description} />
-                                        </td>
-                                    </tr>
-                                )}
-                             />
-                        </div>
-                     </div>
+                        )}
+                    </div>
                  )}
             </div>
         </div>
