@@ -1,4 +1,5 @@
 
+
 interface Env {
   BUCKET: any;
 }
@@ -7,6 +8,7 @@ export const onRequestPut = async (context: any) => {
   const key = context.params.key;
   const url = new URL(context.request.url);
   const projectId = url.searchParams.get('project');
+  const contentType = context.request.headers.get('Content-Type') || 'application/octet-stream';
 
   try {
     if (!context.env.BUCKET) return new Response("R2 Bucket not configured", {status: 500});
@@ -15,7 +17,11 @@ export const onRequestPut = async (context: any) => {
     const storageKey = projectId ? `${projectId}/${key}` : key;
     
     const body = context.request.body; // Stream
-    await context.env.BUCKET.put(storageKey, body);
+    
+    // Save with httpMetadata to ensure correct Content-Type on retrieval (e.g. audio/mpeg)
+    await context.env.BUCKET.put(storageKey, body, {
+        httpMetadata: { contentType: contentType }
+    });
     
     // Return the URL path. We encode the key to treat the path (folder/file) as a single segment 
     // for the [key] route in GET requests.
