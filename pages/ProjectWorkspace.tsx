@@ -6,9 +6,9 @@ import * as gemini from '../services/geminiService';
 import { 
   ArrowLeft, Layout, FileText, Type, 
   List, PanelRightClose, Sparkles, Loader2, Copy, 
-  Check, Images, ArrowRight, Palette, Film, Maximize2, Play,
+  Check, Images, ArrowRight, Palette, Film, Maximize2, Play, Pause,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Music
 } from 'lucide-react';
 
 // --- Sub-Components ---
@@ -26,6 +26,223 @@ const RowCopyButton = ({ text }: { text: string }) => {
       {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
     </button>
   );
+};
+
+// --- Fancy Audio Player Component ---
+const FancyAudioPlayer = ({ 
+    src, 
+    fileName, 
+    isLocal, 
+    onReplace, 
+    onDelete, 
+    isUploading, 
+    uploadProgress,
+    onUpload 
+}: { 
+    src: string, 
+    fileName: string, 
+    isLocal: boolean, 
+    onReplace: () => void, 
+    onDelete?: () => void,
+    isUploading?: boolean,
+    uploadProgress?: number,
+    onUpload?: () => void
+}) => {
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [volume, setVolume] = useState(1);
+    const [isMuted, setIsMuted] = useState(false);
+
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const updateTime = () => {
+            setCurrentTime(audio.currentTime);
+            setProgress((audio.currentTime / audio.duration) * 100);
+        };
+
+        const updateDuration = () => setDuration(audio.duration);
+        const onEnded = () => setIsPlaying(false);
+
+        audio.addEventListener('timeupdate', updateTime);
+        audio.addEventListener('loadedmetadata', updateDuration);
+        audio.addEventListener('ended', onEnded);
+
+        return () => {
+            audio.removeEventListener('timeupdate', updateTime);
+            audio.removeEventListener('loadedmetadata', updateDuration);
+            audio.removeEventListener('ended', onEnded);
+        };
+    }, []);
+
+    const togglePlay = () => {
+        if (!audioRef.current) return;
+        if (isPlaying) {
+            audioRef.current.pause();
+        } else {
+            audioRef.current.play();
+        }
+        setIsPlaying(!isPlaying);
+    };
+
+    const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!audioRef.current) return;
+        const newTime = (Number(e.target.value) / 100) * duration;
+        audioRef.current.currentTime = newTime;
+        setProgress(Number(e.target.value));
+    };
+
+    const toggleMute = () => {
+        if (!audioRef.current) return;
+        audioRef.current.muted = !isMuted;
+        setIsMuted(!isMuted);
+    };
+
+    const formatTime = (time: number) => {
+        if (isNaN(time)) return "00:00";
+        const minutes = Math.floor(time / 60);
+        const seconds = Math.floor(time % 60);
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    return (
+        <div className="w-full bg-slate-900 rounded-3xl overflow-hidden shadow-2xl relative group">
+            {/* Background Gradient & Effects */}
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-900/40 via-fuchsia-900/20 to-slate-900 z-0"></div>
+            <div className={`absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-[radial-gradient(circle,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] z-0 opacity-50 ${isPlaying ? 'animate-[spin_60s_linear_infinite]' : ''}`}></div>
+
+            <div className="relative z-10 p-6 flex flex-col items-center">
+                
+                {/* Visualizer & Icon */}
+                <div className="w-full h-32 flex items-center justify-center gap-1.5 mb-6 relative">
+                     {/* Center Icon */}
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-500 z-20 ${isPlaying ? 'bg-fuchsia-500 shadow-fuchsia-500/50 scale-110' : 'bg-slate-800 shadow-slate-900/50'}`}>
+                        <Music className={`w-8 h-8 ${isPlaying ? 'text-white animate-bounce' : 'text-slate-500'}`} />
+                    </div>
+
+                    {/* Animated Bars (Fake Visualizer) */}
+                    <div className="absolute inset-0 flex items-center justify-center gap-1 opacity-60">
+                         {[...Array(20)].map((_, i) => (
+                             <div 
+                                key={i} 
+                                className={`w-1.5 bg-gradient-to-t from-violet-500 to-fuchsia-400 rounded-full transition-all duration-150 ${isPlaying ? 'animate-pulse' : 'h-2'}`}
+                                style={{ 
+                                    height: isPlaying ? `${Math.random() * 80 + 10}%` : '10%',
+                                    animationDelay: `${i * 0.05}s`
+                                }} 
+                             />
+                         ))}
+                    </div>
+                </div>
+
+                {/* File Info */}
+                <div className="text-center mb-6 w-full">
+                    <h3 className="text-white font-bold text-lg truncate px-4">{fileName}</h3>
+                    <div className="flex items-center justify-center gap-2 mt-2">
+                        {isLocal ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full border border-amber-500/30">
+                                待上传
+                            </span>
+                        ) : (
+                             <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full border border-emerald-500/30 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> 云端已同步
+                            </span>
+                        )}
+                        <span className="text-[10px] text-slate-400 font-mono">{formatTime(duration)}</span>
+                    </div>
+                </div>
+
+                {/* Controls Area */}
+                <div className="w-full bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
+                    <audio ref={audioRef} src={src} preload="metadata" />
+                    
+                    {/* Progress Bar */}
+                    <div className="flex items-center gap-3 mb-4">
+                        <span className="text-[10px] font-mono text-slate-400 w-8 text-right">{formatTime(currentTime)}</span>
+                        <div className="relative flex-1 h-1.5 group/seek">
+                             <div className="absolute inset-0 bg-slate-700 rounded-full"></div>
+                             <div 
+                                className="absolute top-0 left-0 h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full transition-all duration-100"
+                                style={{ width: `${progress}%` }}
+                             ></div>
+                             <input 
+                                type="range" 
+                                min="0" 
+                                max="100" 
+                                value={progress} 
+                                onChange={handleSeek}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                             />
+                             <div 
+                                className="absolute top-1/2 -mt-1.5 h-3 w-3 bg-white rounded-full shadow-lg opacity-0 group-hover/seek:opacity-100 transition-opacity pointer-events-none"
+                                style={{ left: `${progress}%`, marginLeft: '-6px' }}
+                             ></div>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400 w-8">{formatTime(duration)}</span>
+                    </div>
+
+                    {/* Main Buttons */}
+                    <div className="flex items-center justify-between">
+                         <button onClick={toggleMute} className="text-slate-400 hover:text-white transition-colors p-2">
+                             {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                         </button>
+
+                         <div className="flex items-center gap-4">
+                             <button 
+                                onClick={togglePlay}
+                                className="w-12 h-12 bg-white text-slate-900 rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-white/10"
+                             >
+                                 {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
+                             </button>
+                         </div>
+
+                         {/* Actions Menu */}
+                         <div className="flex gap-2">
+                             <button onClick={onReplace} className="text-slate-400 hover:text-white p-2" title="替换">
+                                 <RefreshCw className="w-4 h-4" />
+                             </button>
+                             {onDelete && (
+                                 <button onClick={onDelete} className="text-slate-400 hover:text-rose-500 p-2" title="删除">
+                                     <Trash2 className="w-4 h-4" />
+                                 </button>
+                             )}
+                         </div>
+                    </div>
+                </div>
+
+                {/* Upload Status / Button */}
+                {isLocal && (
+                    <div className="w-full mt-4">
+                        {isUploading ? (
+                             <div className="w-full">
+                                <div className="flex justify-between text-[10px] font-bold text-fuchsia-300 mb-1">
+                                    <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin"/> 上传中...</span>
+                                    <span>{Math.round(uploadProgress || 0)}%</span>
+                                </div>
+                                <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                    <div 
+                                        className="h-full bg-fuchsia-500 transition-all duration-300" 
+                                        style={{ width: `${uploadProgress || 0}%` }}
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                             <button 
+                                onClick={onUpload}
+                                className="w-full py-3 bg-gradient-to-r from-fuchsia-600 to-violet-600 hover:from-fuchsia-500 hover:to-violet-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-fuchsia-900/20 transition-all flex items-center justify-center gap-2 hover:-translate-y-0.5"
+                            >
+                                <CloudUpload className="w-4 h-4" /> 上传到云端
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 };
 
 interface TextResultBoxProps {
@@ -848,17 +1065,6 @@ const ProjectWorkspace: React.FC = () => {
                             )
                          );
                      })()}
-                     {/* Specific Button for Audio File Upload */}
-                     {selectedNodeId === 'audio_file' && pendingAudio && !isArchived && (
-                        <button 
-                             onClick={executeAudioUpload}
-                             disabled={isUploading}
-                             className="px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-all bg-fuchsia-600 text-white hover:bg-fuchsia-700 shadow-md hover:shadow-lg disabled:opacity-50"
-                        >
-                             {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CloudUpload className="w-3 h-3" />}
-                             {isUploading ? `${Math.round(audioUploadProgress)}%` : '上传到云端'}
-                        </button>
-                     )}
                 </div>
             </div>
 
@@ -969,78 +1175,27 @@ const ProjectWorkspace: React.FC = () => {
                             className="hidden" 
                             onChange={handleAudioFileSelect}
                         />
-                        
-                        {/* Status Indicator for Pending Upload */}
-                        {pendingAudio && (
-                             <div className="w-full mb-4 animate-in fade-in slide-in-from-top-2">
-                                 <div className="bg-fuchsia-50 text-fuchsia-700 p-3 rounded-xl border border-fuchsia-200 flex items-center justify-between text-xs font-bold">
-                                     <div className="flex items-center gap-2">
-                                         <AlertCircle className="w-4 h-4" />
-                                         <span>文件已选择，请点击右上角上传到云端</span>
-                                     </div>
-                                 </div>
-                             </div>
-                        )}
 
                         {(project.audioFile || pendingAudio) ? (
-                            <div className="w-full space-y-6">
-                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col items-center">
-                                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors ${pendingAudio ? 'bg-fuchsia-100 text-fuchsia-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                                        <Headphones className="w-8 h-8" />
-                                    </div>
-                                    <h4 className="text-sm font-bold text-slate-700 mb-2 truncate w-full">
-                                        {pendingAudio ? pendingAudio.file.name : decodeURIComponent(project.audioFile!.split('/').pop() || 'audio.mp3')}
-                                    </h4>
-                                    
-                                    {pendingAudio ? (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-fuchsia-100 text-fuchsia-600 rounded mb-4">
-                                            本地预览模式 (未保存)
-                                        </span>
-                                    ) : (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded mb-4 flex items-center gap-1">
-                                            <CheckCircle2 className="w-3 h-3" /> 已保存至云端
-                                        </span>
-                                    )}
-
-                                    {/* Progress Bar Injection */}
-                                    {isUploading && (
-                                        <div className="w-full mb-4 space-y-1">
-                                            <div className="flex justify-between text-[10px] font-bold text-slate-500">
-                                                <span>正在上传...</span>
-                                                <span>{Math.round(audioUploadProgress)}%</span>
-                                            </div>
-                                            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                                                <div 
-                                                    className="h-full bg-fuchsia-500 transition-all duration-300" 
-                                                    style={{ width: `${audioUploadProgress}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <audio controls src={pendingAudio ? pendingAudio.url : project.audioFile} className="w-full" />
-                                </div>
-                                <div className="flex gap-3 justify-center">
-                                    <button 
-                                        onClick={() => audioInputRef.current?.click()}
-                                        className="px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors text-sm"
-                                        disabled={isUploading}
-                                    >
-                                        更换文件
-                                    </button>
-                                    {!pendingAudio && (
-                                        <button 
-                                             onClick={async () => {
-                                                 if(confirm('确定要删除此音频文件吗？')) {
-                                                     await saveProjectUpdate(p => ({ ...p, audioFile: undefined }));
-                                                 }
-                                             }}
-                                             className="px-4 py-2 bg-white border border-rose-200 text-rose-500 rounded-xl font-bold hover:bg-rose-50 transition-colors text-sm flex items-center gap-1"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" /> 删除
-                                        </button>
-                                    )}
-                                </div>
+                            <div className="w-full space-y-6 animate-in zoom-in-95 duration-300">
+                                <FancyAudioPlayer 
+                                    src={pendingAudio ? pendingAudio.url : project.audioFile!}
+                                    fileName={pendingAudio ? pendingAudio.file.name : decodeURIComponent(project.audioFile!.split('/').pop() || 'audio.mp3')}
+                                    isLocal={!!pendingAudio}
+                                    isUploading={isUploading}
+                                    uploadProgress={audioUploadProgress}
+                                    onReplace={() => audioInputRef.current?.click()}
+                                    onDelete={async () => {
+                                        if(confirm('确定要删除此音频文件吗？')) {
+                                            if (pendingAudio) {
+                                                setPendingAudio(null);
+                                            } else {
+                                                await saveProjectUpdate(p => ({ ...p, audioFile: undefined }));
+                                            }
+                                        }
+                                    }}
+                                    onUpload={executeAudioUpload}
+                                />
                             </div>
                         ) : (
                             <div 
