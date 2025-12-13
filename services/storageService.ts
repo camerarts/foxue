@@ -304,7 +304,15 @@ export const uploadFile = async (file: File, projectId?: string): Promise<string
   });
 
   if (!res.ok) {
-    throw new Error('File upload failed');
+    let errMessage = `Upload failed (${res.status})`;
+    try {
+        const errorData = await res.json();
+        if (errorData.error) errMessage += `: ${errorData.error}`;
+    } catch {
+        const text = await res.text();
+        if (text) errMessage += `: ${text.substring(0, 100)}`;
+    }
+    throw new Error(errMessage);
   }
   
   const data = await res.json();
