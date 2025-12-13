@@ -298,6 +298,7 @@ export const uploadFile = async (file: File, projectId?: string, onProgress?: (p
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url.toString());
+    // Important: Setting Content-Type ensures browsers can play/display the file correctly
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
     if (onProgress) {
@@ -312,21 +313,24 @@ export const uploadFile = async (file: File, projectId?: string, onProgress?: (p
     xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
             try {
+                // First try to parse as JSON
                 const data = JSON.parse(xhr.responseText);
                 resolve(data.url);
             } catch (e) {
+                // If not JSON, it might be just text or unexpected
                 reject(new Error("Invalid server response format"));
             }
         } else {
-            let errMessage = `Upload failed (${xhr.status})`;
-            try {
-                const errorData = JSON.parse(xhr.responseText);
-                if (errorData.error) errMessage += `: ${errorData.error}`;
-                else if (xhr.responseText) errMessage += `: ${xhr.responseText.substring(0, 100)}`;
-            } catch {
-                if (xhr.responseText) errMessage += `: ${xhr.responseText.substring(0, 100)}`;
-            }
-            reject(new Error(errMessage));
+             // Handle Error Response
+             let errMessage = `Upload failed (${xhr.status})`;
+             try {
+                 const errorData = JSON.parse(xhr.responseText);
+                 if (errorData.error) errMessage += `: ${errorData.error}`;
+                 else if (xhr.responseText) errMessage += `: ${xhr.responseText.substring(0, 100)}`;
+             } catch {
+                 if (xhr.responseText) errMessage += `: ${xhr.responseText.substring(0, 100)}`;
+             }
+             reject(new Error(errMessage));
         }
     };
 
@@ -365,6 +369,7 @@ export const uploadImage = async (base64: string, projectId?: string): Promise<s
 
   if (!res.ok) {
     let errMessage = `Image upload failed (${res.status})`;
+    // Use .text() then try parse, avoid "body stream used" error
     try {
         const text = await res.text();
         try {
@@ -424,17 +429,17 @@ export const saveProject = async (project: ProjectData): Promise<void> => {
 
 const checkProjectCompletion = (p: ProjectData): boolean => {
   if (!p) return false;
-  // Criteria: Script, Titles, Storyboard (Text), Summary, Cover, and at least 1 generated Image
+  // Canvas Modules: Script, Titles, Audio File, Summary, Cover
+  // The completion logic strictly follows the visible nodes on the ProjectWorkspace canvas.
+  
   const hasScript = !!p.script && p.script.length > 0;
   const hasTitles = !!p.titles && p.titles.length > 0;
-  // NOTE: If user uses Audio File mode, storyboard text might be empty.
-  // We relax this check slightly or assume audioFile counts as 'step done' if storyboard is empty.
-  const hasSbText = (!!p.storyboard && p.storyboard.length > 0) || !!p.audioFile;
+  const hasAudio = !!p.audioFile; // "Upload MP3" Node
   const hasSummary = !!p.summary && p.summary.length > 0;
   const hasCover = !!p.coverOptions && p.coverOptions.length > 0;
-  const hasImages = p.storyboard?.some(f => !!f.imageUrl) || false;
 
-  return hasScript && hasTitles && hasSbText && hasSummary && hasCover && hasImages;
+  // If all canvas modules are generated/uploaded, project is 100% complete
+  return hasScript && hasTitles && hasAudio && hasSummary && hasCover;
 };
 
 export const updateProject = async (id: string, updater: (current: ProjectData) => ProjectData): Promise<ProjectData | null> => {
@@ -629,4 +634,3 @@ export const getToolData = async <T>(id: string): Promise<T | null> => {
         return null;
     }
 };
-
