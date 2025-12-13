@@ -308,6 +308,13 @@ const ProjectWorkspace: React.FC = () => {
     init();
   }, [id]);
 
+  const updateProjectField = async (field: keyof ProjectData, value: any) => {
+    if (!project) return;
+    const updated = { ...project, [field]: value };
+    setProject(updated);
+    await storage.saveProject(updated);
+  };
+
   const handleAudioFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -668,11 +675,99 @@ const ProjectWorkspace: React.FC = () => {
                         title="视频脚本" 
                         content={project.script || ''} 
                         placeholder="AI 将在此生成脚本..."
-                        onSave={(val) => { /* update logic */ }} 
+                        onSave={(val) => updateProjectField('script', val)} 
                     />
                  )}
-                 
-                 {/* ... other node types rendered similarly with clean components ... */}
+
+                 {selectedNodeId === 'titles' && (
+                    <div className="space-y-4">
+                        {!project.titles || project.titles.length === 0 ? (
+                            <div className="text-center py-10 text-slate-400">
+                                <Type className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                                <p>暂无标题，请点击节点上的“生成”按钮。</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {project.titles.map((item, idx) => (
+                                    <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-slate-100 text-slate-500 text-xs font-bold px-1.5 py-0.5 rounded">{idx + 1}</span>
+                                                {item.score && (
+                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                                                        item.score >= 90 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                                        item.score >= 80 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-500 border-slate-100'
+                                                    }`}>{item.score}分</span>
+                                                )}
+                                            </div>
+                                            <RowCopyButton text={item.title} />
+                                        </div>
+                                        <h4 className="text-slate-800 font-bold mb-2">{item.title}</h4>
+                                        {item.keywords && (
+                                            <div className="flex flex-wrap gap-1">
+                                                {item.keywords.split(/[,，]/).map((k, i) => (
+                                                    <span key={i} className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-100">
+                                                        {k.trim()}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                 )}
+
+                 {selectedNodeId === 'summary' && (
+                    <TextResultBox 
+                        title="简介与标签" 
+                        content={project.summary || ''} 
+                        placeholder="AI 将在此生成视频简介和标签..."
+                        onSave={(val) => updateProjectField('summary', val)} 
+                    />
+                 )}
+
+                 {selectedNodeId === 'cover' && (
+                     <div className="space-y-4">
+                        {!project.coverOptions || project.coverOptions.length === 0 ? (
+                            <div className="text-center py-10 text-slate-400">
+                                <Palette className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                                <p>暂无封面方案，请点击节点上的“生成”按钮。</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {project.coverOptions.map((item, idx) => (
+                                    <div key={idx} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center">
+                                            <span className="text-xs font-bold text-slate-500 uppercase">方案 {idx + 1}</span>
+                                            {item.score && (
+                                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{item.score} 推荐</span>
+                                            )}
+                                        </div>
+                                        <div className="p-4 space-y-4">
+                                            <div>
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">画面描述</span>
+                                                <div className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                                    {item.visual}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase block">封面文案</span>
+                                                    <RowCopyButton text={item.copy} />
+                                                </div>
+                                                <div className="text-sm font-black text-slate-800 bg-slate-900/5 p-3 rounded-lg border border-slate-200 whitespace-pre-wrap font-sans">
+                                                    {item.copy}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                     </div>
+                 )}
             </div>
         </div>
 
