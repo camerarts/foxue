@@ -41,6 +41,9 @@ export interface ProjectData {
   updatedAt: number;
   status: ProjectStatus;
   
+  // New field for Dashboard row highlighting
+  marked?: boolean;
+
   // Inputs
   inputs: {
     topic: string;
