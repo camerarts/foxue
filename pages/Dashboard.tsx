@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProjectData, ProjectStatus } from '../types';
@@ -132,6 +133,26 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleToggleMark = async (e: React.MouseEvent, project: ProjectData) => {
+      e.stopPropagation();
+      const updated = { ...project, marked: !project.marked };
+      
+      // Optimistic update
+      setProjects(prev => prev.map(p => p.id === project.id ? updated : p));
+      
+      await storage.saveProject(updated);
+      
+      // Background sync
+      setSyncStatus('saving');
+      try {
+          await storage.uploadProjects();
+          setSyncStatus('synced');
+          setLastSyncTime(new Date().toLocaleTimeString());
+      } catch(e) {
+          setSyncStatus('error');
+      }
+  };
+
   const isProjectFullyComplete = (p: ProjectData) => {
       const hasScript = !!p.script && p.script.length > 0;
       const hasTitles = !!p.titles && p.titles.length > 0;
@@ -232,7 +253,11 @@ const Dashboard: React.FC = () => {
                                 <tr 
                                     key={project.id} 
                                     onClick={() => navigate(`/project/${project.id}`)}
-                                    className="group hover:bg-slate-50/80 transition-all cursor-pointer"
+                                    className={`group transition-all cursor-pointer ${
+                                        project.marked 
+                                        ? 'bg-emerald-50 hover:bg-emerald-100 border-l-4 border-l-emerald-500' 
+                                        : 'hover:bg-slate-50/80 border-l-4 border-l-transparent'
+                                    }`}
                                 >
                                     <td className="py-4 px-4 text-center text-sm font-bold text-slate-400 border-r border-slate-200">
                                         {index + 1}
@@ -316,6 +341,22 @@ const Dashboard: React.FC = () => {
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             )}
+
+                                            <div className="w-px h-4 bg-slate-200 mx-1"></div>
+
+                                            <input
+                                                type="checkbox"
+                                                checked={!!project.marked}
+                                                onClick={(e) => e.stopPropagation()} // Stop row click
+                                                onChange={(e) => {
+                                                    // Use e.nativeEvent to avoid React synthetic event issues if needed, 
+                                                    // but simple stopPropagation on container click works best.
+                                                    // Here we use a dedicated handler that stops propagation.
+                                                    handleToggleMark(e as any, project);
+                                                }}
+                                                className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                                                title="标记为已完成"
+                                            />
                                         </div>
                                     </td>
                                 </tr>
