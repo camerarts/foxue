@@ -8,7 +8,7 @@ import {
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play, Pause,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2, Download, Music4
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2, Download, Music4, Clock
 } from 'lucide-react';
 
 const RowCopyButton = ({ text }: { text: string }) => {
@@ -437,7 +437,13 @@ const ProjectWorkspace: React.FC = () => {
 
   const updateProjectField = async (field: keyof ProjectData, value: any) => {
     if (!project) return;
-    const updated = { ...project, [field]: value };
+    
+    // Update timestamp if manual edit corresponds to a node
+    const timestamps = { ...(project.moduleTimestamps || {}) };
+    if (field === 'script') timestamps['script'] = Date.now();
+    if (field === 'summary') timestamps['summary'] = Date.now();
+
+    const updated = { ...project, [field]: value, moduleTimestamps: timestamps };
     setProject(updated);
     await storage.saveProject(updated);
     triggerBackgroundSync();
@@ -458,7 +464,12 @@ const ProjectWorkspace: React.FC = () => {
       setIsUploading(true);
       try {
           const cloudUrl = await storage.uploadFile(pendingAudio.file, project.id, (p) => setAudioUploadProgress(p));
-          const updated = { ...project, audioFile: cloudUrl };
+          
+          // Update timestamp
+          const ts = Date.now();
+          const timestamps = { ...(project.moduleTimestamps || {}), audio_file: ts };
+          
+          const updated = { ...project, audioFile: cloudUrl, moduleTimestamps: timestamps };
           setProject(updated);
           await storage.saveProject(updated);
           setPendingAudio(null);
@@ -540,7 +551,11 @@ const ProjectWorkspace: React.FC = () => {
              update = { coverOptions: data };
         }
 
-        const newProject = { ...project, ...update };
+        // Update timestamps
+        const now = Date.now();
+        const timestamps = { ...(project.moduleTimestamps || {}), [nodeId]: now };
+
+        const newProject = { ...project, ...update, moduleTimestamps: timestamps };
         setProject(newProject);
         await storage.saveProject(newProject);
         triggerBackgroundSync();
@@ -583,6 +598,15 @@ const ProjectWorkspace: React.FC = () => {
       const ex = end.x;
       const ey = end.y + NODE_HEIGHT / 2;
       return `M ${sx} ${sy} C ${sx + (ex - sx) / 2} ${sy} ${ex - (ex - sx) / 2} ${ey} ${ex} ${ey}`;
+  };
+
+  const formatTime = (ts?: number) => {
+    if (!ts) return '';
+    const date = new Date(ts);
+    const today = new Date();
+    const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+    if (isToday) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
   };
 
   if (loading || !project) return <div className="flex justify-center items-center h-full text-slate-500 font-bold">加载中...</div>;
@@ -718,6 +742,8 @@ const ProjectWorkspace: React.FC = () => {
                          ActionIcon = RefreshCw;
                      }
 
+                     const timeStr = formatTime(project.moduleTimestamps?.[node.id]);
+
                      return (
                          <div 
                             key={node.id}
@@ -737,7 +763,10 @@ const ProjectWorkspace: React.FC = () => {
                                      <node.icon className={`w-5 h-5 ${hasData ? 'text-emerald-500' : `text-${node.color}-500`}`} />
                                      {node.label}
                                  </div>
-                                 {isActive && <div className={`w-2 h-2 rounded-full bg-${node.color}-500 animate-pulse`}></div>}
+                                 <div className="flex items-center gap-2">
+                                     {timeStr && <span className="text-[10px] font-medium text-slate-400 bg-white/50 px-1.5 py-0.5 rounded border border-slate-100/50">{timeStr}</span>}
+                                     {isActive && <div className={`w-2 h-2 rounded-full bg-${node.color}-500 animate-pulse`}></div>}
+                                 </div>
                              </div>
 
                              <div className="p-5 flex flex-col justify-between flex-1 relative">
