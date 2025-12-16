@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
 import * as storage from '../services/storageService';
@@ -53,6 +52,12 @@ const FancyAudioPlayer = ({
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
 
+    // Generate stable visualizer bars
+    const bars = useMemo(() => Array.from({ length: 12 }).map(() => ({
+        delay: Math.random() * -1, // Negative delay for immediate offset start
+        duration: 0.6 + Math.random() * 0.8 // Random duration between 0.6s and 1.4s
+    })), []);
+
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio) return;
@@ -104,6 +109,12 @@ const FancyAudioPlayer = ({
 
     return (
         <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
+             <style>{`
+                @keyframes music-bar-bounce {
+                    0%, 100% { height: 4px; opacity: 0.5; }
+                    50% { height: 100%; opacity: 1; }
+                }
+             `}</style>
              <audio ref={audioRef} src={src} preload="metadata" />
 
              {/* Top Info Section */}
@@ -127,15 +138,17 @@ const FancyAudioPlayer = ({
                      </div>
                  </div>
                  
-                 {/* Visualizer Bars (Simulated) */}
+                 {/* Visualizer Bars (Smooth CSS Animation) */}
                  <div className="hidden sm:flex items-center gap-0.5 h-8">
-                    {[...Array(12)].map((_, i) => (
+                    {bars.map((bar, i) => (
                         <div 
                             key={i} 
-                            className={`w-1 bg-indigo-500 rounded-full transition-all duration-300 ${isPlaying ? 'animate-music-bar' : 'h-1 opacity-20'}`}
+                            className={`w-1 bg-indigo-500 rounded-full transition-all duration-300`}
                             style={{ 
-                                height: isPlaying ? `${Math.random() * 100}%` : '4px',
-                                animationDelay: `${i * 0.1}s` 
+                                height: isPlaying ? 'auto' : '4px',
+                                animation: isPlaying ? `music-bar-bounce ${bar.duration}s ease-in-out infinite` : 'none',
+                                animationDelay: `${bar.delay}s`,
+                                opacity: isPlaying ? 1 : 0.2
                             }} 
                         />
                     ))}
@@ -808,7 +821,7 @@ const ProjectWorkspace: React.FC = () => {
                             {(project.audioFile || pendingAudio) ? (
                                 <FancyAudioPlayer 
                                     src={pendingAudio ? pendingAudio.url : project.audioFile!}
-                                    fileName={pendingAudio ? pendingAudio.file.name : '音频文件.mp3'}
+                                    fileName={pendingAudio ? pendingAudio.file.name : `${(project.title || 'audio').replace(/[\\/:*?"<>|]/g, "_")}.mp3`}
                                     isLocal={!!pendingAudio}
                                     isUploading={isUploading}
                                     uploadProgress={audioUploadProgress}
@@ -972,4 +985,3 @@ const ProjectWorkspace: React.FC = () => {
 };
 
 export default ProjectWorkspace;
-
