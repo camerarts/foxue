@@ -44,6 +44,9 @@ export interface ProjectData {
   // New field for Dashboard row highlighting
   marked?: boolean;
 
+  // New field to track update times for specific canvas nodes
+  moduleTimestamps?: Record<string, number>;
+
   // Inputs
   inputs: {
     topic: string;
