@@ -63,7 +63,8 @@ const handleApiError = (error: any, defaultMsg: string): never => {
   throw new Error(msg || defaultMsg);
 };
 
-export const generateText = async (prompt: string, customApiKey?: string, modelName: string = 'gemini-2.5-flash'): Promise<string> => {
+// UPDATED: Default model changed to gemini-2.5-flash-lite-preview-09-2025
+export const generateText = async (prompt: string, customApiKey?: string, modelName: string = 'gemini-2.5-flash-lite-preview-09-2025'): Promise<string> => {
   try {
     if (!prompt || !prompt.trim()) {
        throw new Error("Prompt is empty");
@@ -83,6 +84,7 @@ export const generateText = async (prompt: string, customApiKey?: string, modelN
   return ''; // Should be unreachable
 };
 
+// UPDATED: Default model changed to gemini-2.5-flash-lite-preview-09-2025
 export const generateJSON = async <T>(prompt: string, schema?: any, customApiKey?: string): Promise<T> => {
   try {
     if (!prompt || !prompt.trim()) {
@@ -92,7 +94,7 @@ export const generateJSON = async <T>(prompt: string, schema?: any, customApiKey
     
     // Wrap API call with retry mechanism
     const response = await retryOperation(() => ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.5-flash-lite-preview-09-2025',
       contents: { parts: [{ text: prompt }] },
       config: {
         responseMimeType: "application/json",
