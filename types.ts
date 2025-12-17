@@ -1,5 +1,3 @@
-
-
 export enum ProjectStatus {
   DRAFT = 'DRAFT',
   IN_PROGRESS = 'IN_PROGRESS',
@@ -126,15 +124,17 @@ export const DEFAULT_PROMPTS: Record<string, PromptTemplate> = {
     id: 'summary',
     name: '视频总结',
     description: '生成视频简介和标签',
-    template: `请为以下脚本撰写一段适合发布的视频简介（Description）和标签（Tags）。
+    template: `你是一位专业的视频运营专家。请为以下脚本撰写适合社交媒体发布的总结内容。
     
 脚本内容:
 {{script}}
 
-格式要求：
-1. 视频简介（200字以内）
-2. 时间戳（基于脚本结构估算）
-3. 相关标签（Hashtags）`
+**输出要求：**
+请直接输出以下三个部分，确保内容简洁有力，禁止输出任何无关的开场白。
+
+1. 【视频简介】：总结视频核心价值，吸引用户观看（150字左右）。
+2. 【内容大纲】：列出视频的3-5个核心看点。
+3. 【热门标签】：提供5-8个相关的搜索关键词，以 # 形式展现。`
   },
   COVER_GEN: {
     id: 'cover_gen',
@@ -156,4 +156,3 @@ export const DEFAULT_PROMPTS: Record<string, PromptTemplate> = {
 - "score": 推荐分数(1-100)。`
   }
 };
-
