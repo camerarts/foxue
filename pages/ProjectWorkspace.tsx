@@ -719,7 +719,7 @@ const ProjectWorkspace: React.FC = () => {
                 </svg>
 
                 {/* Nodes */}
-                {NODES_CONFIG.map((node) => {
+                {NODES_CONFIG.map((node, index) => {
                      const isActive = selectedNodeId === node.id;
                      const isGenerating = generatingNodes.has(node.id);
                      let hasData = false;
@@ -760,11 +760,23 @@ const ProjectWorkspace: React.FC = () => {
                              {/* Header */}
                              <div className={`h-12 w-full border-b flex items-center px-4 justify-between bg-gradient-to-r ${hasData ? 'from-emerald-50 to-white border-emerald-100' : 'from-white to-slate-50 border-slate-100'}`}>
                                  <div className="flex items-center gap-2 font-bold text-slate-700">
+                                     <span className={`flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-extrabold border mr-1 ${
+                                        hasData 
+                                        ? 'bg-emerald-100 text-emerald-600 border-emerald-200' 
+                                        : `bg-${node.color}-50 text-${node.color}-600 border-${node.color}-100`
+                                    }`}>
+                                        {index + 1}
+                                    </span>
                                      <node.icon className={`w-5 h-5 ${hasData ? 'text-emerald-500' : `text-${node.color}-500`}`} />
                                      {node.label}
                                  </div>
                                  <div className="flex items-center gap-2">
-                                     {timeStr && <span className="text-[10px] font-medium text-slate-400 bg-white/50 px-1.5 py-0.5 rounded border border-slate-100/50">{timeStr}</span>}
+                                     {timeStr && (
+                                        <span className="flex items-center gap-1 text-[9px] font-medium text-slate-400 bg-white/60 px-1.5 py-0.5 rounded-full border border-slate-100/50 backdrop-blur-sm" title="最后更新时间">
+                                            <Clock className="w-2.5 h-2.5" />
+                                            {timeStr}
+                                        </span>
+                                     )}
                                      {isActive && <div className={`w-2 h-2 rounded-full bg-${node.color}-500 animate-pulse`}></div>}
                                  </div>
                              </div>
