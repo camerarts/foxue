@@ -528,28 +528,30 @@ const ProjectWorkspace: React.FC = () => {
 
         // Logic based on Node ID
         if (nodeId === 'script') {
+             // Safe replacement for all occurrences
              const inputPrompt = prompts['SCRIPT']?.template 
-                .replace('{{topic}}', project.inputs.topic || project.title)
-                .replace('{{tone}}', project.inputs.tone)
-                .replace('{{language}}', project.inputs.language) || '';
+                .replace(/\{\{topic\}\}/g, project.inputs.topic || project.title)
+                .replace(/\{\{tone\}\}/g, project.inputs.tone)
+                .replace(/\{\{language\}\}/g, project.inputs.language) || '';
+            
             let text = await gemini.generateText(inputPrompt, customKey);
             // Auto clean asterisks from generated script
             text = text.replace(/\*/g, '');
             update = { script: text };
         } else if (nodeId === 'titles') {
              const p = promptTemplate
-                .replace('{{title}}', project.title)
-                .replace('{{script}}', project.script || '');
+                .replace(/\{\{title\}\}/g, project.title)
+                .replace(/\{\{script\}\}/g, project.script || '');
              const data = await gemini.generateJSON<TitleItem[]>(p, undefined, customKey);
              update = { titles: data };
         } else if (nodeId === 'summary') {
-             const p = promptTemplate.replace('{{script}}', project.script || '');
+             const p = promptTemplate.replace(/\{\{script\}\}/g, project.script || '');
              const text = await gemini.generateText(p, customKey);
              update = { summary: text };
         } else if (nodeId === 'cover') {
              const p = promptTemplate
-                .replace('{{title}}', project.title)
-                .replace('{{script}}', project.script || '');
+                .replace(/\{\{title\}\}/g, project.title)
+                .replace(/\{\{script\}\}/g, project.script || '');
              
              // Define schema to ensure correct structure
              const schema = {
