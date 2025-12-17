@@ -8,7 +8,7 @@ import {
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play, Pause,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2, Download, Music4, Clock, Settings2, Key, X
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2, Download, Music4, Clock, Settings2, Key, X, ClipboardPaste
 } from 'lucide-react';
 
 const RowCopyButton = ({ text }: { text: string }) => {
@@ -438,12 +438,23 @@ const ProjectWorkspace: React.FC = () => {
   const saveApiSettings = () => {
       localStorage.setItem('lva_custom_api_key', customKey);
       setShowConfigModal(false);
-      alert("API 配置已保存，优先使用您填写的密钥。");
+      alert("API 配置已保存。");
   };
 
   const getMaskedKey = (key: string) => {
       if (!key || key.length < 8) return '';
       return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
+  };
+
+  const handlePasteApi = async () => {
+      try {
+          const text = await navigator.clipboard.readText();
+          if (text) setCustomKey(text.trim());
+      } catch (err) {
+          // Fallback mechanism could be added here if needed
+          console.error("Failed to read clipboard");
+          alert("无法读取剪贴板，请手动粘贴。");
+      }
   };
 
   const triggerBackgroundSync = () => {
@@ -1074,17 +1085,29 @@ const ProjectWorkspace: React.FC = () => {
                               {customKey && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded font-mono">{getMaskedKey(customKey)}</span>}
                           </label>
                           <div className="relative">
-                              <Key className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+                              <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                               <input 
                                   type="password"
                                   value={customKey}
                                   onChange={(e) => setCustomKey(e.target.value)}
-                                  placeholder="sk-..."
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                                  placeholder={customKey ? "已设置 (点击修改)" : "使用系统默认 Key (sk-...)"}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-10 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
                               />
+                              <button
+                                  onClick={handlePasteApi}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                  title="从剪贴板粘贴"
+                              >
+                                  <ClipboardPaste className="w-4 h-4" />
+                              </button>
                           </div>
                           <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                              填写后，此处 Key 将优先于系统后台 (D1/Pages) 环境变量使用。<br/>
+                              {customKey ? (
+                                  <span className="text-indigo-600 font-bold">当前优先使用自定义 Key。</span>
+                              ) : (
+                                  <span className="text-slate-500">当前为空，将自动使用系统后台配置的默认 Key。</span>
+                              )}
+                              <br/>
                               Key 仅保存在本地浏览器缓存中。
                           </p>
                       </div>
