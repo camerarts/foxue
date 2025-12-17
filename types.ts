@@ -10,28 +10,26 @@ export enum ProjectStatus {
 export interface StoryboardFrame {
   id: string;
   sceneNumber: number;
-  originalText?: string; // New field for source script text
+  originalText?: string;
   description: string;
-  imageUrl?: string; // Base64 or URL
+  imageUrl?: string;
   imagePrompt?: string;
-  imageModel?: string; // Model used for generation
-  timeRange?: string; // New field for subtitle timestamps
-  skipGeneration?: boolean; // New field to skip image generation
+  imageModel?: string;
+  timeRange?: string;
+  skipGeneration?: boolean;
 }
 
 export interface TitleItem {
   title: string;
-  type?: string; // Legacy
-  keywords?: string; // New field
-  score?: number; // Recommendation score
+  keywords?: string;
+  score?: number;
 }
 
 export interface CoverOption {
-  visual: string; // Scene description
-  copy?: string;   // Legacy field
-  titleTop: string; // Main Title (Upper)
-  titleBottom: string; // Sub Title (Lower)
-  score?: number; // Recommendation score
+  visual: string;
+  titleTop: string;
+  titleBottom: string;
+  score?: number;
 }
 
 export interface ProjectData {
@@ -40,51 +38,37 @@ export interface ProjectData {
   createdAt: number;
   updatedAt: number;
   status: ProjectStatus;
-  
-  // New field for Dashboard row highlighting
   marked?: boolean;
-
-  // New field to track update times for specific canvas nodes
   moduleTimestamps?: Record<string, number>;
-
-  // Inputs
   inputs: {
     topic: string;
-    // Removed corePoint, audience, duration
     tone: string;
     language: string;
   };
-
-  // Outputs
   script?: string;
   storyboard?: StoryboardFrame[];
-  titles?: TitleItem[]; // Structured titles
+  titles?: TitleItem[];
   summary?: string;
-  coverText?: string; // Legacy field
-  coverOptions?: CoverOption[]; // New structured cover options
-  coverImage?: {
-    imageUrl: string;
-    title: string;
-    prompt: string;
-  };
-  audioFile?: string; // URL to uploaded audio file
+  coverOptions?: CoverOption[];
+  coverImage?: { imageUrl: string };
+  audioFile?: string;
 }
 
 export interface Inspiration {
   id: string;
-  content: string; // Original text/link
+  content: string;
   category: string;
   trafficLogic: string;
   viralTitle: string;
   rating?: string;
-  marked?: boolean; // New field for selection/marking state
+  marked?: boolean;
   createdAt: number;
 }
 
 export interface PromptTemplate {
   id: string;
   name: string;
-  template: string; // Uses {{variable}} syntax
+  template: string;
   description: string;
 }
 
@@ -113,173 +97,63 @@ export const DEFAULT_PROMPTS: Record<string, PromptTemplate> = {
     
 **严格要求：**
 1. 提取脚本中的每一句或每一段对应的【原文】。
-2. 为每一段原文设计具体的、可拍摄的【画面描述】（人物、动作、环境、光线）。
-3. **严禁**在画面描述中包含任何画质修饰词或提示词工程术语（如：8k, 4k, HD, 电影感, 大师级, 风格, --ar, high quality等）。
-4. 必须使用**纯中文**描述。
+2. 为每一段原文设计具体的、可拍摄的【画面描述】。
+3. 严禁包含画质修饰词。
+4. 必须使用纯中文描述。
 
 脚本内容:
 {{script}}
 
-请仅返回一个纯 JSON 对象数组（不要Markdown格式）。每个对象包含两个字段：
-- "original": 对应的原始脚本文字。
-- "description": 具体的画面描述（纯中文，无修饰词）。
-
-示例：
-[
-  {
-    "original": "2025年的东京街头，霓虹灯闪烁。",
-    "description": "繁忙的涩谷十字路口，人流穿梭，俯拍视角，蓝紫色霓虹灯光"
-  },
-  {
-    "original": "男主角看着手中的全息屏幕陷入沉思。",
-    "description": "一名年轻男子坐在充满科技感的房间里，面前是发光的全息屏幕，侧面特写"
-  }
-]
-`
+请仅返回一个纯 JSON 对象数组。每个对象包含字段："original" 和 "description"。`
   },
   TITLES: {
     id: 'titles',
     name: '标题生成',
     description: '基于脚本生成具有病毒传播潜力的标题',
-    template: `请基于以下视频脚本，生成10个具有病毒传播潜力、高点击率的YouTube/B站风格标题。
+    template: `请基于以下视频脚本，生成10个具有病毒传播潜力的标题。
 
 主题: {{title}}
-脚本内容概要：
-{{script}}
+脚本内容：{{script}}
 
-要求：
-1. 标题必须紧扣脚本的核心内容。
-2. 要有冲击力，引发好奇心或情感共鸣。
-
-请返回一个纯 JSON 数组（不要Markdown格式），数组中每个对象包含三个字段：
-- "title": 具体的标题文本
-- "keywords": 标题对应的关键标签（例如：悬念、利益、反差、情绪、干货等），确保准确提炼。
-- "score": 推荐指数（1-100分），代表该标题的潜在点击率预估。
-
-示例：
-[
-  {"title": "普通人如何利用AI在30天内赚到第一桶金？", "keywords": "悬念,赚钱,AI", "score": 95},
-  {"title": "揭秘OpenAI内部：你不知道的5个真相", "keywords": "揭秘,科技,真相", "score": 88}
-]
-`
+**输出格式要求：**
+必须仅返回一个 JSON 数组，严禁返回 Markdown 表格或任何解释性文字。
+数组中每个对象包含：
+- "title": 标题文本
+- "keywords": 关键标签
+- "score": 推荐指数(1-100)`
   },
   SUMMARY: {
     id: 'summary',
     name: '视频总结',
     description: '生成视频简介和标签',
-    template: `请为以下脚本撰写一段适合发布在YouTube/B站的视频简介（Description）和标签（Tags）。
+    template: `请为以下脚本撰写一段适合发布的视频简介（Description）和标签（Tags）。
     
 脚本内容:
 {{script}}
 
 格式要求：
-1. 视频简介（200字以内，概括核心价值）
+1. 视频简介（200字以内）
 2. 时间戳（基于脚本结构估算）
 3. 相关标签（Hashtags）`
-  },
-  IMAGE_GEN_A: {
-    id: 'image_gen_a',
-    name: '分镜画面提示词A',
-    description: '图片生成配置方案 A (默认：电影质感)',
-    template: `电影感，大师级构图，超高清分辨率，极高细节，照片级真实，宽画幅。 {{description}}`
-  },
-  IMAGE_GEN_B: {
-    id: 'image_gen_b',
-    name: '分镜画面提示词B',
-    description: '图片生成配置方案 B (备用：漫画风格)',
-    template: `线条漫画插画写实风格，半真实，仿真皮肤，原创角色质感，超清画质，黑色线条厚涂。 {{description}}`
   },
   COVER_GEN: {
     id: 'cover_gen',
     name: '封面文字策划',
     description: '基于脚本内容生成封面方案',
-    template: `请基于以下视频脚本，策划 3 个高点击率的封面（Thumbnail）方案。
+    template: `你是一名顶尖的短视频封面设计师。请基于以下内容策划 3 个高点击率的封面方案。
     
 主题: {{title}}
-脚本内容:
-{{script}}
+脚本内容: {{script}}
 
-**核心要求：**
-每个封面方案必须包含两行文字设计：
-1. **主标题 (titleTop)**：位于封面最显眼位置，字数少，冲击力强（如：痛点、核心利益、疑问）。
-2. **副标题 (titleBottom)**：作为补充说明或情绪引导，字体稍小（如：反差、结果、号召）。
+**输出格式严正声明：**
+必须仅输出一个合法的 JSON 数组，严禁输出 Markdown 表格（即严禁使用 | 符号作为格式）。
+如果违反此格式，系统将无法解析。
 
-请返回一个纯 JSON 数组（不要Markdown格式），数组中每个对象包含以下字段：
-- "visual": 详细的画面描述（包含主体、表情、背景颜色、氛围）。
-- "titleTop": 封面上方的主标题文案。
-- "titleBottom": 封面下方的副标题文案。
-- "score": 推荐指数（1-100分）。
-
-示例：
-[
-  {
-    "visual": "极度震惊的表情特写，背景是燃烧的红色火焰", 
-    "titleTop": "月薪三千怎么存钱？",
-    "titleBottom": "学会这招资产翻倍", 
-    "score": 95
-  },
-  {
-    "visual": "左右分屏对比...", 
-    "titleTop": "大错特错的旧观念",
-    "titleBottom": "高手都从顶层学起", 
-    "score": 88
-  }
-]
-`
-  },
-  INSPIRATION_EXTRACT: {
-    id: 'insp_extract',
-    name: '灵感提取助手',
-    description: '从杂乱文本中提取结构化灵感信息',
-    template: `请分析以下灵感文本（可能是一段笔记、文章摘要或视频脚本草稿），并提取关键信息。
-
-灵感文本：
-{{content}}
-
-请返回一个纯 JSON 对象（不要Markdown格式），包含以下字段：
-- "category": 归属的视频赛道/类目（例如：科技数码、商业思维、生活Vlog、情感励志等）。
-- "trafficLogic": 分析这个选题为什么能获得流量（流量逻辑）。
-- "viralTitle": 基于此灵感拟定一个爆款标题。
-
-示例：
-{
-  "category": "商业思维",
-  "trafficLogic": "利用信息差，满足用户对副业赚钱的渴望，通过具体案例增加可信度。",
-  "viralTitle": "普通人翻身机会！2025年这3个风口搞钱项目，错过再等十年"
-}
-`
-  },
-  AI_TITLES_GENERATOR: {
-    id: 'ai_titles_gen',
-    name: 'AI 标题生成',
-    description: '独立工具：基于输入的标题方向或内容生成爆款标题与封面方案',
-    template: `请基于以下给出的标题方向，生成一组爆款视频标题，以及一个高点击率的封面策划方案。
-
-标题方向:
-{{TITLE_DIRECTION}}
-
-要求：
-1. 标题风格多样，适配 YouTube/B站/抖音 调性。
-2. 封面策划要吸睛，元素丰富。
-3. 封面文案要简短有力。
-4. **重要**：为每个标题打分（score），分数范围 60-99。根据标题的吸引力、情绪价值和点击潜力打分。严禁全部打0分。
-
-请返回一个纯 JSON 对象（不要Markdown格式），**必须严格包含**以下三个字段：
-- "titles": 对象数组，包含 10 个具有病毒传播潜力的标题。每个对象包含：
-    - "title": 标题文本 (String)
-    - "score": 推荐指数 (Number)，必须是 60 到 99 之间的整数。
-- "coverVisual": 字符串，详细描述封面画面的视觉元素、构图、颜色和氛围。
-- "coverText": 字符串，封面上的大字文案（简短有力，建议2-4行）。
-
-示例 JSON 结构:
-{
-  "titles": [
-      { "title": "标题1...", "score": 95 },
-      { "title": "标题2...", "score": 88 }
-  ],
-  "coverVisual": "一个震惊的表情特写...",
-  "coverText": "文字行1\\n文字行2"
-}
-`
+每个对象必须包含：
+- "visual": 视觉画面详细描述（主体、表情、氛围）。
+- "titleTop": 封面最上方的主标题（短小、冲击力强）。
+- "titleBottom": 封面下方的补充文案（反差、结果）。
+- "score": 推荐分数(1-100)。`
   }
 };
+
