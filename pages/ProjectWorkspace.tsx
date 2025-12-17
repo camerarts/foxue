@@ -539,14 +539,12 @@ const ProjectWorkspace: React.FC = () => {
 
         // Logic based on Node ID
         if (nodeId === 'script') {
-             // Safe replacement for all occurrences
              const inputPrompt = prompts['SCRIPT']?.template 
                 .replace(/\{\{topic\}\}/g, project.inputs.topic || project.title)
                 .replace(/\{\{tone\}\}/g, project.inputs.tone)
                 .replace(/\{\{language\}\}/g, project.inputs.language) || '';
             
             let text = await gemini.generateText(inputPrompt, customKey);
-            // Auto clean asterisks from generated script
             text = text.replace(/\*/g, '');
             update = { script: text };
         } else if (nodeId === 'titles') {
@@ -557,14 +555,17 @@ const ProjectWorkspace: React.FC = () => {
              update = { titles: data };
         } else if (nodeId === 'summary') {
              const p = promptTemplate.replace(/\{\{script\}\}/g, project.script || '');
-             const text = await gemini.generateText(p, customKey);
+             let text = await gemini.generateText(p, customKey);
+             // Ensure it's not empty and clean it
+             text = text.trim();
+             if (!text) throw new Error("AI 返回了空总结内容，请稍后重试。");
+             text = text.replace(/\*/g, ''); // Clean asterisks
              update = { summary: text };
         } else if (nodeId === 'cover') {
              const p = promptTemplate
                 .replace(/\{\{title\}\}/g, project.title)
                 .replace(/\{\{script\}\}/g, project.script || '');
              
-             // Define schema to ensure correct structure
              const schema = {
                 type: "ARRAY",
                 items: {
@@ -583,14 +584,18 @@ const ProjectWorkspace: React.FC = () => {
              update = { coverOptions: data };
         }
 
-        // Update timestamps
-        const now = Date.now();
-        const timestamps = { ...(project.moduleTimestamps || {}), [nodeId]: now };
-
-        const newProject = { ...project, ...update, moduleTimestamps: timestamps };
-        setProject(newProject);
-        await storage.saveProject(newProject);
-        triggerBackgroundSync();
+        // Use functional update to ensure thread safety
+        setProject(prev => {
+            if (!prev) return null;
+            const now = Date.now();
+            const timestamps = { ...(prev.moduleTimestamps || {}), [nodeId]: now };
+            const nextProject = { ...prev, ...update, moduleTimestamps: timestamps };
+            
+            // Side effect to persist
+            storage.saveProject(nextProject).then(() => triggerBackgroundSync());
+            
+            return nextProject;
+        });
         
     } catch (e: any) {
         console.error(e);
@@ -610,7 +615,7 @@ const ProjectWorkspace: React.FC = () => {
     // Targets: Titles, Summary, Cover
     const targets = [
         { id: 'titles', hasData: !!project.titles && project.titles.length > 0 },
-        { id: 'summary', hasData: !!project.summary },
+        { id: 'summary', hasData: !!project.summary && project.summary.trim().length > 0 },
         { id: 'cover', hasData: !!project.coverOptions && project.coverOptions.length > 0 }
     ];
 
@@ -770,7 +775,7 @@ const ProjectWorkspace: React.FC = () => {
                      if (node.id === 'script') hasData = !!project.script;
                      if (node.id === 'titles') hasData = !!project.titles && project.titles.length > 0;
                      if (node.id === 'audio_file') hasData = !!project.audioFile || !!pendingAudio;
-                     if (node.id === 'summary') hasData = !!project.summary;
+                     if (node.id === 'summary') hasData = !!project.summary && project.summary.trim().length > 0;
                      if (node.id === 'cover') hasData = !!project.coverOptions && project.coverOptions.length > 0;
 
                      // Determine button label/icon based on node type
@@ -976,6 +981,7 @@ const ProjectWorkspace: React.FC = () => {
                         placeholder="AI 将在此生成视频简介和标签..."
                         onSave={(val) => updateProjectField('summary', val)} 
                         showStats={true}
+                        autoCleanAsterisks={true}
                     />
                  )}
 
@@ -990,7 +996,7 @@ const ProjectWorkspace: React.FC = () => {
                             <div className="space-y-6">
                                 {project.coverOptions.map((item, idx) => {
                                     // Logic to automatically split Top Title if separators exist
-                                    let displayTop = item.titleTop || item.copy || '';
+                                    let displayTop = item.titleTop || '';
                                     let displayBottom = item.titleBottom || '';
 
                                     // Check for separators ｜, |, /, -, or space to split the main title
