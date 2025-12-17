@@ -25,7 +25,8 @@ const handleApiError = (error: any, defaultMsg: string): never => {
 
   // Check for Bad Request (400) - often invalid parameters
   if (msg.includes('400') || msg.includes('INVALID_ARGUMENT')) {
-      throw new Error("请求参数无效 (400)。可能是该模型不支持当前的配置（如宽高比或分辨率），或者提示词包含非法内容。");
+      // Differentiate message slightly or keep it broad but accurate
+      throw new Error("请求参数无效 (400)。可能是提示词内容包含特殊字符，或模型配置不兼容。");
   }
 
   // Check for Not Found (404) - Model not found or no access
@@ -42,12 +43,15 @@ const handleApiError = (error: any, defaultMsg: string): never => {
   throw new Error(msg || defaultMsg);
 };
 
-export const generateText = async (prompt: string, modelName: string = 'gemini-2.5-flash'): Promise<string> => {
+export const generateText = async (prompt: string, customApiKey?: string, modelName: string = 'gemini-2.5-flash'): Promise<string> => {
   try {
-    const ai = getClient();
+    if (!prompt || !prompt.trim()) {
+       throw new Error("Prompt is empty");
+    }
+    const ai = getClient(customApiKey);
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: prompt,
+      contents: { parts: [{ text: prompt }] },
     });
     return response.text || '';
   } catch (error: any) {
@@ -56,12 +60,15 @@ export const generateText = async (prompt: string, modelName: string = 'gemini-2
   return ''; // Should be unreachable
 };
 
-export const generateJSON = async <T>(prompt: string, schema?: any): Promise<T> => {
+export const generateJSON = async <T>(prompt: string, schema?: any, customApiKey?: string): Promise<T> => {
   try {
-    const ai = getClient();
+    if (!prompt || !prompt.trim()) {
+       throw new Error("Prompt is empty");
+    }
+    const ai = getClient(customApiKey);
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: { parts: [{ text: prompt }] },
       config: {
         responseMimeType: "application/json",
         responseSchema: schema
