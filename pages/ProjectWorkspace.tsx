@@ -8,7 +8,7 @@ import {
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play, Pause,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2, Download, Music4, Clock
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2, Download, Music4, Clock, Settings2, Key, X
 } from 'lucide-react';
 
 const RowCopyButton = ({ text }: { text: string }) => {
@@ -372,6 +372,10 @@ const ProjectWorkspace: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'synced' | 'error' | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState('');
   
+  // API Config State
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [customKey, setCustomKey] = useState('');
+
   // Activity Tracking Refs
   const lastActivityRef = useRef(Date.now());
   const isBusyRef = useRef(false);
@@ -423,9 +427,24 @@ const ProjectWorkspace: React.FC = () => {
         }
         const loadedPrompts = await storage.getPrompts();
         setPrompts(loadedPrompts);
+
+        // Load custom API key from local storage
+        const storedKey = localStorage.getItem('lva_custom_api_key');
+        if (storedKey) setCustomKey(storedKey);
     };
     init();
   }, [id]);
+
+  const saveApiSettings = () => {
+      localStorage.setItem('lva_custom_api_key', customKey);
+      setShowConfigModal(false);
+      alert("API 配置已保存，优先使用您填写的密钥。");
+  };
+
+  const getMaskedKey = (key: string) => {
+      if (!key || key.length < 8) return '';
+      return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
+  };
 
   const triggerBackgroundSync = () => {
        setSyncStatus('saving');
@@ -513,7 +532,7 @@ const ProjectWorkspace: React.FC = () => {
                 .replace('{{topic}}', project.inputs.topic || project.title)
                 .replace('{{tone}}', project.inputs.tone)
                 .replace('{{language}}', project.inputs.language) || '';
-            let text = await gemini.generateText(inputPrompt);
+            let text = await gemini.generateText(inputPrompt, customKey);
             // Auto clean asterisks from generated script
             text = text.replace(/\*/g, '');
             update = { script: text };
@@ -521,11 +540,11 @@ const ProjectWorkspace: React.FC = () => {
              const p = promptTemplate
                 .replace('{{title}}', project.title)
                 .replace('{{script}}', project.script || '');
-             const data = await gemini.generateJSON<TitleItem[]>(p);
+             const data = await gemini.generateJSON<TitleItem[]>(p, undefined, customKey);
              update = { titles: data };
         } else if (nodeId === 'summary') {
              const p = promptTemplate.replace('{{script}}', project.script || '');
-             const text = await gemini.generateText(p);
+             const text = await gemini.generateText(p, customKey);
              update = { summary: text };
         } else if (nodeId === 'cover') {
              const p = promptTemplate
@@ -547,7 +566,7 @@ const ProjectWorkspace: React.FC = () => {
                 }
              };
 
-             const data = await gemini.generateJSON<CoverOption[]>(p, schema);
+             const data = await gemini.generateJSON<CoverOption[]>(p, schema, customKey);
              update = { coverOptions: data };
         }
 
@@ -631,8 +650,18 @@ const ProjectWorkspace: React.FC = () => {
             </h1>
         </div>
 
-        {/* Top Right "One Click" Button and Sync Status */}
+        {/* Top Right Buttons: API Config, Sync, One Click */}
         <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
+             {/* API Config Button */}
+            <button
+                onClick={() => setShowConfigModal(true)}
+                className={`h-9 px-3 rounded-lg font-bold text-xs flex items-center gap-2 transition-all shadow-sm border backdrop-blur-sm ${customKey ? 'bg-indigo-50/90 text-indigo-600 border-indigo-200' : 'bg-white/80 text-slate-600 border-slate-200 hover:border-slate-300'}`}
+                title="API 配置"
+            >
+                <Settings2 className="w-4 h-4" />
+                <span className="hidden sm:inline">API</span>
+            </button>
+
             {/* Sync Badge */}
             <div className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border shadow-sm backdrop-blur-sm transition-colors ${
                 syncStatus === 'synced' ? 'bg-emerald-50/90 text-emerald-600 border-emerald-100' :
@@ -1020,6 +1049,62 @@ const ProjectWorkspace: React.FC = () => {
                  )}
             </div>
         </div>
+
+      {/* API Config Modal */}
+      {showConfigModal && (
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                  <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                      <h3 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+                          <Settings2 className="w-6 h-6 text-indigo-600" />
+                          API 配置
+                      </h3>
+                      <button onClick={() => setShowConfigModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                          <X className="w-6 h-6" />
+                      </button>
+                  </div>
+                  
+                  <div className="p-8 space-y-6">
+                      {/* API Key Input */}
+                      <div>
+                          <label className="text-sm font-bold text-slate-700 mb-2 flex items-center justify-between">
+                              <span>自定义 API Key (可选)</span>
+                              {customKey && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded font-mono">{getMaskedKey(customKey)}</span>}
+                          </label>
+                          <div className="relative">
+                              <Key className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+                              <input 
+                                  type="password"
+                                  value={customKey}
+                                  onChange={(e) => setCustomKey(e.target.value)}
+                                  placeholder="sk-..."
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                              />
+                          </div>
+                          <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                              填写后，此处 Key 将优先于系统后台 (D1/Pages) 环境变量使用。<br/>
+                              Key 仅保存在本地浏览器缓存中。
+                          </p>
+                      </div>
+                  </div>
+
+                  <div className="px-8 py-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+                      <button 
+                          onClick={() => { setCustomKey(''); }}
+                          className="px-4 py-2 text-slate-500 font-bold text-sm hover:text-rose-600 transition-colors"
+                      >
+                          清空
+                      </button>
+                      <button 
+                          onClick={saveApiSettings}
+                          className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition-all text-sm"
+                      >
+                          保存配置
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
 
     </div>
   );
