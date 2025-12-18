@@ -139,7 +139,8 @@ const ArchiveRepo: React.FC = () => {
                     <thead className="bg-slate-50 text-slate-600">
                         <tr>
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-16 text-center">序号</th>
-                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-40 text-center">序列号</th>
+                            {/* Increased width from w-40 to w-52 to ensure serial numbers like [2025-01-20-001] don't wrap */}
+                            <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-52 text-center">序列号</th>
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider">视频主题</th>
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-32 text-center">操作</th>
                         </tr>
@@ -150,7 +151,11 @@ const ArchiveRepo: React.FC = () => {
                             return (
                                 <tr key={project.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="py-4 px-4 text-center text-sm font-bold text-slate-300">{index + 1}</td>
-                                    <td className="py-4 px-4 text-center"><span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200">{serial}</span></td>
+                                    <td className="py-4 px-4 text-center">
+                                        <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200 whitespace-nowrap">
+                                            {serial}
+                                        </span>
+                                    </td>
                                     <td className="py-4 px-4"><div className="font-bold text-slate-600 truncate max-w-md">{project.title}</div></td>
                                     <td className="py-4 px-4 text-center">
                                         <div className="flex items-center justify-center gap-2">
