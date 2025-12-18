@@ -45,12 +45,13 @@ const RowCopyButton = ({ text }: { text: string }) => {
   );
 };
 
-const FancyAudioPlayer = ({ src, fileName, isLocal, onReplace, onDelete, isUploading, uploadProgress, onUpload }: any) => {
+const FancyAudioPlayer = ({ src, fileName, downloadName, isLocal, onReplace, onDelete, isUploading, uploadProgress, onUpload }: any) => {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [isDownloading, setIsDownloading] = useState(false);
 
     const bars = useMemo(() => Array.from({ length: 24 }).map(() => ({
         delay: Math.random() * -1.5,
@@ -87,6 +88,30 @@ const FancyAudioPlayer = ({ src, fileName, isLocal, onReplace, onDelete, isUploa
         const newTime = (Number(e.target.value) / 100) * duration;
         audioRef.current.currentTime = newTime;
         setProgress(Number(e.target.value));
+    };
+
+    const handleDownload = async () => {
+        if (!src || isDownloading) return;
+        setIsDownloading(true);
+        try {
+            const response = await fetch(src);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            // Clean filename and add mp3 extension
+            const safeName = (downloadName || fileName || 'audio').replace(/[\\/:*?"<>|]/g, "_");
+            a.download = `${safeName}.mp3`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Download failed:', err);
+            alert('下载失败');
+        } finally {
+            setIsDownloading(false);
+        }
     };
 
     const formatTime = (time: number) => {
@@ -179,6 +204,9 @@ const FancyAudioPlayer = ({ src, fileName, isLocal, onReplace, onDelete, isUploa
                         {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-1" />}
                     </button>
                     <div className="flex gap-1.5 px-2">
+                        <button onClick={handleDownload} disabled={isDownloading} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white/50 rounded-xl transition-all" title="下载音频">
+                            {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                        </button>
                         <button onClick={onReplace} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white/50 rounded-xl transition-all" title="替换文件"><RefreshCw className="w-4 h-4" /></button>
                         {onDelete && <button onClick={onDelete} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all" title="删除"><Trash2 className="w-4 h-4" /></button>}
                     </div>
@@ -434,7 +462,18 @@ const ProjectWorkspace: React.FC = () => {
                         {/* Bottom 1/3: Audio Player / Upload Area */}
                         <div className="flex-[1] overflow-y-auto min-h-[220px]">
                             <div className="space-y-4">
-                                {(project.audioFile || pendingAudio) && <FancyAudioPlayer src={pendingAudio ? pendingAudio.url : project.audioFile} fileName={pendingAudio ? pendingAudio.file.name : '音频文件.mp3'} isLocal={!!pendingAudio} isUploading={isUploading} uploadProgress={uploadProgress} onReplace={() => audioInputRef.current?.click()} onUpload={executeAudioUpload} />}
+                                {(project.audioFile || pendingAudio) && (
+                                    <FancyAudioPlayer 
+                                        src={pendingAudio ? pendingAudio.url : project.audioFile} 
+                                        fileName={pendingAudio ? pendingAudio.file.name : '音频文件.mp3'} 
+                                        downloadName={project.title}
+                                        isLocal={!!pendingAudio} 
+                                        isUploading={isUploading} 
+                                        uploadProgress={uploadProgress} 
+                                        onReplace={() => audioInputRef.current?.click()} 
+                                        onUpload={executeAudioUpload} 
+                                    />
+                                )}
                                 {!project.audioFile && !pendingAudio && <div onClick={() => audioInputRef.current?.click()} className="h-40 border-2 border-dashed border-slate-200 bg-white/50 backdrop-blur rounded-[32px] flex flex-col items-center justify-center gap-4 text-slate-400 cursor-pointer hover:bg-white hover:border-indigo-300 hover:text-indigo-600 transition-all group">
                                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center group-hover:bg-indigo-50 transition-all">
                                         <Upload className="w-8 h-8" />
