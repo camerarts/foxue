@@ -511,11 +511,13 @@ const ProjectWorkspace: React.FC = () => {
                         <div className="space-y-4">
                             {project.coverOptions?.map((o, i) => (
                                 <div key={i} className="bg-white rounded-xl border overflow-hidden">
-                                    <div className="bg-slate-50 px-4 py-2 border-b text-[10px] font-black uppercase text-slate-400 tracking-widest">方案 {i+1}</div>
+                                    <div className="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
+                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">方案 {i+1}</span>
+                                        <RowCopyButton text={`${o.titleTop}\n${o.titleBottom}`} />
+                                    </div>
                                     <div className="p-4 space-y-3">
                                         <div className="text-lg font-black text-slate-800 leading-tight">{o.titleTop}</div>
                                         <div className="text-sm font-bold text-slate-500">{o.titleBottom}</div>
-                                        <div className="pt-2 text-[10px] text-slate-400 italic">视觉: {o.visual}</div>
                                     </div>
                                 </div>
                             ))}
