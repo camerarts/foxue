@@ -1,44 +1,33 @@
-
-
 import { ProjectData, PromptTemplate, DEFAULT_PROMPTS, ProjectStatus, Inspiration } from '../types';
 
 // API Endpoints
 const API_BASE = '/api';
 const DB_NAME = 'LVA_DB';
-const DB_VERSION = 2; // Increased for 'tools' store
+const DB_VERSION = 2; 
 const STORE_PROJECTS = 'projects';
 const STORE_INSPIRATIONS = 'inspirations';
-const STORE_TOOLS = 'tools'; // New store
+const STORE_TOOLS = 'tools'; 
 const KEY_PROMPTS = 'lva_prompts'; 
-const KEY_LAST_UPLOAD = 'lva_last_upload_time';
-const KEY_LAST_LOCAL_CHANGE = 'lva_last_local_change_time';
+
+// Granular change tracking keys
+const MODULES = ['projects', 'inspirations', 'prompts', 'tools'] as const;
+type ModuleName = typeof MODULES[number];
+
+const getChangeKey = (mod: ModuleName) => `lva_last_change_${mod}`;
+const getUploadKey = (mod: ModuleName) => `lva_last_upload_${mod}`;
 
 // --- IndexedDB Helpers ---
-
 const openDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_PROJECTS)) {
-        db.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_INSPIRATIONS)) {
-        db.createObjectStore(STORE_INSPIRATIONS, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_TOOLS)) {
-        db.createObjectStore(STORE_TOOLS, { keyPath: 'id' });
-      }
+      if (!db.objectStoreNames.contains(STORE_PROJECTS)) db.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORE_INSPIRATIONS)) db.createObjectStore(STORE_INSPIRATIONS, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORE_TOOLS)) db.createObjectStore(STORE_TOOLS, { keyPath: 'id' });
     };
-
-    request.onsuccess = (event) => {
-      resolve((event.target as IDBOpenDBRequest).result);
-    };
-
-    request.onerror = (event) => {
-      reject((event.target as IDBOpenDBRequest).error);
-    };
+    request.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
+    request.onerror = (event) => reject((event.target as IDBOpenDBRequest).error);
   });
 };
 
@@ -86,551 +75,261 @@ const dbDelete = async (storeName: string, key: string): Promise<void> => {
   });
 };
 
-// --- Mutex for Atomic Updates ---
-class Mutex {
-  private queue: Promise<void> = Promise.resolve();
+// --- Tracking & Sync State ---
 
-  async lock<T>(task: () => Promise<T>): Promise<T> {
-    let release: () => void;
-    const currentLock = new Promise<void>(resolve => { release = resolve; });
-    
-    // Wait for previous task
-    const previous = this.queue;
-    this.queue = this.queue.then(() => currentLock);
-
-    await previous;
-    
-    try {
-      return await task();
-    } finally {
-      release!();
-    }
-  }
-}
-
-const projectMutex = new Mutex();
-
-// --- Manual Sync Methods (D1 Bulk) ---
-
-export const trackChange = () => {
-  localStorage.setItem(KEY_LAST_LOCAL_CHANGE, Date.now().toString());
+export const trackChange = (mod: ModuleName = 'projects') => {
+  localStorage.setItem(getChangeKey(mod), Date.now().toString());
 };
 
-export const hasUnsavedChanges = (): boolean => {
-  const lastUpload = parseInt(localStorage.getItem(KEY_LAST_UPLOAD) || '0');
-  const lastChange = parseInt(localStorage.getItem(KEY_LAST_LOCAL_CHANGE) || '0');
-  // If we have changes newer than the last upload, return true
-  return lastChange > lastUpload;
+const updateUploadTimestamp = (mod: ModuleName) => {
+  localStorage.setItem(getUploadKey(mod), Date.now().toString());
 };
+
+export const getUnsavedModules = (): string[] => {
+  const dirty: string[] = [];
+  const labels: Record<ModuleName, string> = {
+    projects: '项目数据',
+    inspirations: '灵感仓库',
+    prompts: '提示词配置',
+    tools: '工具数据'
+  };
+
+  MODULES.forEach(mod => {
+    const lastChange = parseInt(localStorage.getItem(getChangeKey(mod)) || '0');
+    const lastUpload = parseInt(localStorage.getItem(getUploadKey(mod)) || '0');
+    if (lastChange > lastUpload) dirty.push(labels[mod]);
+  });
+  return dirty;
+};
+
+export const hasUnsavedChanges = (): boolean => getUnsavedModules().length > 0;
 
 export const getLastUploadTime = (): string => {
-  const ts = localStorage.getItem(KEY_LAST_UPLOAD);
-  if (!ts) return '从未上传';
-  const date = new Date(parseInt(ts));
+  // Use the latest upload time among all modules
+  const times = MODULES.map(mod => parseInt(localStorage.getItem(getUploadKey(mod)) || '0'));
+  const max = Math.max(...times);
+  if (max === 0) return '从未上传';
+  const date = new Date(max);
   const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 / ${pad(date.getHours())}：${pad(date.getMinutes())}：${pad(date.getSeconds())}`;
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-export const updateLastUploadTime = () => {
-  localStorage.setItem(KEY_LAST_UPLOAD, Date.now().toString());
-};
-
-// Granular Upload Functions for Progress Tracking
+// --- Upload Methods ---
 
 export const uploadProjects = async (): Promise<void> => {
   const projects = await dbGetAll<ProjectData>(STORE_PROJECTS);
-  
-  // SANITIZATION: Remove Base64 images from payload
-  // We only want to sync metadata and cloud URLs to D1.
   const sanitizedProjects = projects.map(p => {
     const copy = { ...p };
-    
     if (copy.storyboard) {
         copy.storyboard = copy.storyboard.map(frame => ({
             ...frame,
-            // If it's a base64 string (starts with data:), don't send it to server.
-            // If it's a URL (starts with /api/ or http), keep it.
             imageUrl: frame.imageUrl?.startsWith('data:') ? undefined : frame.imageUrl
         }));
     }
-    
     if (copy.coverImage?.imageUrl?.startsWith('data:')) {
         copy.coverImage = { ...copy.coverImage, imageUrl: '' };
     }
-
     return copy;
   });
 
-  const payload = { projects: sanitizedProjects };
-  
   const res = await fetch(`${API_BASE}/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ projects: sanitizedProjects })
   });
-
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `Projects upload failed: ${res.statusText}`);
-  }
+  if (!res.ok) throw new Error("Projects upload failed");
+  updateUploadTimestamp('projects');
 };
 
 export const uploadInspirations = async (): Promise<void> => {
   const inspirations = await dbGetAll<Inspiration>(STORE_INSPIRATIONS);
-  const payload = { inspirations };
-  
   const res = await fetch(`${API_BASE}/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ inspirations })
   });
-
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `Inspirations upload failed: ${res.statusText}`);
-  }
+  if (!res.ok) throw new Error("Inspirations upload failed");
+  updateUploadTimestamp('inspirations');
 };
 
 export const uploadPrompts = async (): Promise<void> => {
   const promptsStr = localStorage.getItem(KEY_PROMPTS);
   const prompts = promptsStr ? JSON.parse(promptsStr) : DEFAULT_PROMPTS;
-  const payload = { prompts };
-  
   const res = await fetch(`${API_BASE}/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ prompts })
   });
-
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `Settings upload failed: ${res.statusText}`);
-  }
+  if (!res.ok) throw new Error("Prompts upload failed");
+  updateUploadTimestamp('prompts');
 };
 
 export const uploadTools = async (): Promise<void> => {
   const tools = await dbGetAll<{id: string, data: any}>(STORE_TOOLS);
-  const payload = { tools };
-  
   const res = await fetch(`${API_BASE}/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ tools })
   });
-
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `Tools upload failed: ${res.statusText}`);
-  }
+  if (!res.ok) throw new Error("Tools upload failed");
+  updateUploadTimestamp('tools');
 };
 
 export const downloadAllData = async (): Promise<void> => {
-  // 1. Fetch from D1 Sync Endpoint
   const res = await fetch(`${API_BASE}/sync`);
-  if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `Download failed: ${res.statusText}`);
-  }
-
+  if (!res.ok) throw new Error("Download failed");
   const data = await res.json();
 
-  // 2. Update Local Stores (Merge/Overwrite)
-  if (data.projects && Array.isArray(data.projects)) {
-    for (const p of data.projects) await dbPut(STORE_PROJECTS, p);
-  }
-  
-  if (data.inspirations && Array.isArray(data.inspirations)) {
-    for (const i of data.inspirations) await dbPut(STORE_INSPIRATIONS, i);
-  }
-
-  if (data.tools && Array.isArray(data.tools)) {
-    for (const t of data.tools) await dbPut(STORE_TOOLS, t);
-  }
-  
+  if (data.projects) for (const p of data.projects) await dbPut(STORE_PROJECTS, p);
+  if (data.inspirations) for (const i of data.inspirations) await dbPut(STORE_INSPIRATIONS, i);
+  if (data.tools) for (const t of data.tools) await dbPut(STORE_TOOLS, t);
   if (data.prompts) {
     const merged = { ...DEFAULT_PROMPTS, ...data.prompts };
     localStorage.setItem(KEY_PROMPTS, JSON.stringify(merged));
   }
   
-  // Update last upload time to match download (synced state)
-  updateLastUploadTime();
-  // Also sync the local change time so it doesn't show as dirty immediately
-  localStorage.setItem(KEY_LAST_LOCAL_CHANGE, Date.now().toString());
+  // Sync all timestamps to current to show 'synced' state
+  const now = Date.now();
+  MODULES.forEach(mod => {
+      localStorage.setItem(getUploadKey(mod), now.toString());
+      localStorage.setItem(getChangeKey(mod), now.toString());
+  });
 };
 
-// New Method: Fetch and update a SINGLE project from cloud (Lightweight)
-export const syncProject = async (id: string): Promise<ProjectData | null> => {
-  try {
-      // Fetch specifically just one project to save bandwidth/time
-      const res = await fetch(`${API_BASE}/projects/${id}`);
-      
-      if (res.status === 404) {
-          // Project might be deleted on cloud, do nothing or handle
-          return null; 
-      }
-      
-      if (!res.ok) throw new Error('Failed to fetch project');
-      
-      const project = await res.json();
-      
-      // Update Local DB
-      await dbPut(STORE_PROJECTS, project);
-      
-      return project as ProjectData;
-  } catch (e) {
-      console.warn("Single project sync failed", e);
-      return null;
-  }
-};
-
-// --- Image Operations (R2) ---
+// --- Other Operations ---
 
 export const uploadFile = async (file: File, projectId?: string, onProgress?: (percent: number) => void): Promise<string> => {
   const ext = file.name.split('.').pop() || 'bin';
   const filename = `${crypto.randomUUID()}.${ext}`;
-
-  // Upload to R2 Endpoint with optional project folder param
   const url = new URL(`${window.location.origin}${API_BASE}/images/${filename}`);
-  if (projectId) {
-      url.searchParams.set('project', projectId);
-  }
+  if (projectId) url.searchParams.set('project', projectId);
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url.toString());
-    // Important: Setting Content-Type ensures browsers can play/display the file correctly
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-
     if (onProgress) {
         xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-                const percentComplete = (event.loaded / event.total) * 100;
-                onProgress(percentComplete);
-            }
+            if (event.lengthComputable) onProgress((event.loaded / event.total) * 100);
         };
     }
-
     xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-                // First try to parse as JSON
-                const data = JSON.parse(xhr.responseText);
-                resolve(data.url);
-            } catch (e) {
-                // If not JSON, it might be just text or unexpected
-                reject(new Error("Invalid server response format"));
-            }
-        } else {
-             // Handle Error Response
-             let errMessage = `Upload failed (${xhr.status})`;
-             try {
-                 const errorData = JSON.parse(xhr.responseText);
-                 if (errorData.error) errMessage += `: ${errorData.error}`;
-                 else if (xhr.responseText) errMessage += `: ${xhr.responseText.substring(0, 100)}`;
-             } catch {
-                 if (xhr.responseText) errMessage += `: ${xhr.responseText.substring(0, 100)}`;
-             }
-             reject(new Error(errMessage));
-        }
+        if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText).url);
+        else reject(new Error(`Upload failed (${xhr.status})`));
     };
-
-    xhr.onerror = () => {
-        reject(new Error("Network Error"));
-    };
-
+    xhr.onerror = () => reject(new Error("Network Error"));
     xhr.send(file);
   });
 };
 
 export const uploadImage = async (base64: string, projectId?: string): Promise<string> => {
-  // Convert base64 to blob
   const byteString = atob(base64.split(',')[1]);
   const mimeString = base64.split(',')[0].split(':')[1].split(';')[0];
   const ab = new ArrayBuffer(byteString.length);
   const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
+  for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
   const blob = new Blob([ab], { type: mimeString });
-
-  const ext = mimeString.split('/')[1] || 'png';
-  const filename = `${crypto.randomUUID()}.${ext}`;
-
-  // Upload to R2 Endpoint with optional project folder param
+  const filename = `${crypto.randomUUID()}.${mimeString.split('/')[1] || 'png'}`;
   const url = new URL(`${window.location.origin}${API_BASE}/images/${filename}`);
-  if (projectId) {
-      url.searchParams.set('project', projectId);
-  }
+  if (projectId) url.searchParams.set('project', projectId);
 
-  const res = await fetch(url.toString(), {
-    method: 'PUT',
-    body: blob
-  });
-
-  if (!res.ok) {
-    let errMessage = `Image upload failed (${res.status})`;
-    // Use .text() then try parse, avoid "body stream used" error
-    try {
-        const text = await res.text();
-        try {
-             const json = JSON.parse(text);
-             if (json.error) errMessage += `: ${json.error}`;
-             else if (text) errMessage += `: ${text.substring(0, 100)}`;
-        } catch {
-             if (text) errMessage += `: ${text.substring(0, 100)}`;
-        }
-    } catch { }
-    throw new Error(errMessage);
-  }
-  
+  const res = await fetch(url.toString(), { method: 'PUT', body: blob });
+  if (!res.ok) throw new Error("Image upload failed");
   const data = await res.json();
-  return data.url; // e.g. /api/images/encodedPath
+  return data.url;
 };
-
-export const deleteImage = async (imageUrl: string): Promise<void> => {
-  // Extract key from URL: /api/images/[encodedKey]
-  const match = imageUrl.match(/\/api\/images\/(.+)$/);
-  if (match && match[1]) {
-    try {
-      await fetch(`${API_BASE}/images/${match[1]}`, { method: 'DELETE' });
-    } catch (e) {
-      console.warn("Failed to delete image from R2", e);
-    }
-  }
-};
-
-// --- Local CRUD Methods (No Network) ---
 
 export const getProjects = async (): Promise<ProjectData[]> => {
-  try {
-    return await dbGetAll<ProjectData>(STORE_PROJECTS);
-  } catch (error) {
-    console.error("DB Error", error);
-    return [];
-  }
+  try { return await dbGetAll<ProjectData>(STORE_PROJECTS); } catch { return []; }
 };
 
 export const getProject = async (id: string): Promise<ProjectData | undefined> => {
-  try {
-    return await dbGet<ProjectData>(STORE_PROJECTS, id);
-  } catch (e) { 
-    return undefined;
-  }
+  try { return await dbGet<ProjectData>(STORE_PROJECTS, id); } catch { return undefined; }
 };
 
 export const saveProject = async (project: ProjectData): Promise<void> => {
-  const payload = {
-    ...project,
-    updatedAt: Date.now()
-  };
-  await dbPut(STORE_PROJECTS, payload);
-  trackChange();
-};
-
-const checkProjectCompletion = (p: ProjectData): boolean => {
-  if (!p) return false;
-  // Canvas Modules: Script, Titles, Audio File, Summary, Cover
-  // The completion logic strictly follows the visible nodes on the ProjectWorkspace canvas.
-  
-  const hasScript = !!p.script && p.script.length > 0;
-  const hasTitles = !!p.titles && p.titles.length > 0;
-  const hasAudio = !!p.audioFile; // "Upload MP3" Node
-  const hasSummary = !!p.summary && p.summary.length > 0;
-  const hasCover = !!p.coverOptions && p.coverOptions.length > 0;
-
-  // If all canvas modules are generated/uploaded, project is 100% complete
-  return hasScript && hasTitles && hasAudio && hasSummary && hasCover;
-};
-
-export const updateProject = async (id: string, updater: (current: ProjectData) => ProjectData): Promise<ProjectData | null> => {
-  return projectMutex.lock(async () => {
-      const current = await dbGet<ProjectData>(STORE_PROJECTS, id);
-      if (!current) return null;
-
-      const updated = updater(current);
-      
-      // Auto-status update based on content completeness
-      if (updated.status !== ProjectStatus.ARCHIVED) {
-          if (checkProjectCompletion(updated)) {
-              updated.status = ProjectStatus.COMPLETED;
-          } else if (updated.status === ProjectStatus.COMPLETED && !checkProjectCompletion(updated)) {
-              // Downgrade to IN_PROGRESS if data was removed
-              updated.status = ProjectStatus.IN_PROGRESS;
-          } else if (updated.script && updated.status === ProjectStatus.DRAFT) {
-              // Upgrade to IN_PROGRESS if script exists
-              updated.status = ProjectStatus.IN_PROGRESS;
-          }
-      }
-
-      updated.updatedAt = Date.now();
-      
-      await dbPut(STORE_PROJECTS, updated);
-      trackChange();
-      return updated;
-  });
+  await dbPut(STORE_PROJECTS, { ...project, updatedAt: Date.now() });
+  trackChange('projects');
 };
 
 export const archiveProject = async (id: string): Promise<void> => {
-    await updateProject(id, (p) => ({ ...p, status: ProjectStatus.ARCHIVED }));
+    const p = await dbGet<ProjectData>(STORE_PROJECTS, id);
+    if (p) await saveProject({ ...p, status: ProjectStatus.ARCHIVED });
 };
 
 export const unarchiveProject = async (id: string): Promise<void> => {
-    await updateProject(id, (p) => ({ 
-        ...p, 
-        // Logic in updateProject will automatically verify if it's COMPLETED or IN_PROGRESS
-        status: ProjectStatus.IN_PROGRESS 
-    }));
+    const p = await dbGet<ProjectData>(STORE_PROJECTS, id);
+    if (p) await saveProject({ ...p, status: ProjectStatus.IN_PROGRESS });
 };
 
 export const createProject = async (initialTitle?: string): Promise<string> => {
-  const newProject: ProjectData = {
-    id: crypto.randomUUID(),
+  const newId = crypto.randomUUID();
+  await saveProject({
+    id: newId,
     title: initialTitle || '未命名项目',
     status: ProjectStatus.DRAFT,
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    inputs: {
-      topic: initialTitle || '',
-      tone: '信息丰富且引人入胜',
-      language: '中文'
-    }
-  };
-  
-  await saveProject(newProject);
-  return newProject.id;
+    inputs: { topic: initialTitle || '', tone: '信息丰富', language: '中文' }
+  });
+  return newId;
 };
 
 export const deleteProject = async (id: string): Promise<void> => {
-  // 1. Get project to find images
-  const project = await dbGet<ProjectData>(STORE_PROJECTS, id);
-  
-  if (project) {
-    // 2. Delete cloud images from R2
-    const imagesToDelete: string[] = [];
-    
-    // Collect storyboard images
-    if (project.storyboard) {
-      project.storyboard.forEach(f => {
-        if (f.imageUrl && f.imageUrl.includes('/api/images/')) {
-          imagesToDelete.push(f.imageUrl);
-        }
-      });
-    }
-    
-    // Collect cover image
-    if (project.coverImage?.imageUrl && project.coverImage.imageUrl.includes('/api/images/')) {
-      imagesToDelete.push(project.coverImage.imageUrl);
-    }
-    
-    // Collect audio file
-    if (project.audioFile && project.audioFile.includes('/api/images/')) {
-      imagesToDelete.push(project.audioFile);
-    }
-
-    // Execute deletes in background
-    for (const imgUrl of imagesToDelete) {
-      await deleteImage(imgUrl);
-    }
-  }
-
-  // 3. Delete from Local DB
   await dbDelete(STORE_PROJECTS, id);
-  
-  // 4. Delete from Remote D1
-  try {
-    await fetch(`${API_BASE}/projects/${id}`, { method: 'DELETE' });
-  } catch (e) {
-    console.warn("Failed to delete project from D1", e);
-  }
-
-  trackChange();
+  try { await fetch(`${API_BASE}/projects/${id}`, { method: 'DELETE' }); } catch {}
+  trackChange('projects');
 };
 
-// --- Prompts (Local Only) ---
-
 export const getPrompts = async (): Promise<Record<string, PromptTemplate>> => {
-  try {
-    const local = localStorage.getItem(KEY_PROMPTS);
-    if (local) {
-      return { ...DEFAULT_PROMPTS, ...JSON.parse(local) };
-    }
-  } catch (e) { /* ignore */ }
-  return DEFAULT_PROMPTS;
+  const local = localStorage.getItem(KEY_PROMPTS);
+  return local ? { ...DEFAULT_PROMPTS, ...JSON.parse(local) } : DEFAULT_PROMPTS;
 };
 
 export const savePrompts = async (prompts: Record<string, PromptTemplate>): Promise<void> => {
   localStorage.setItem(KEY_PROMPTS, JSON.stringify(prompts));
-  trackChange();
+  trackChange('prompts');
 };
-
-export const resetPrompts = async (): Promise<void> => {
-  await savePrompts(DEFAULT_PROMPTS);
-};
-
-// --- Inspiration Methods (Local Only) ---
 
 export const getInspirations = async (): Promise<Inspiration[]> => {
-  try {
-    return await dbGetAll<Inspiration>(STORE_INSPIRATIONS);
-  } catch (e) {
-    return [];
-  }
+  try { return await dbGetAll<Inspiration>(STORE_INSPIRATIONS); } catch { return []; }
 };
 
 export const saveInspiration = async (item: Inspiration): Promise<void> => {
   await dbPut(STORE_INSPIRATIONS, item);
-  trackChange();
+  trackChange('inspirations');
 };
 
 export const deleteInspiration = async (id: string): Promise<void> => {
   await dbDelete(STORE_INSPIRATIONS, id);
-  try {
-    await fetch(`${API_BASE}/inspirations/${id}`, { method: 'DELETE' });
-  } catch (e) {}
-  trackChange();
+  try { await fetch(`${API_BASE}/inspirations/${id}`, { method: 'DELETE' }); } catch {}
+  trackChange('inspirations');
 };
 
-// --- Tools Methods (Real-time Cloud Sync) ---
-
 export const saveToolData = async (id: string, data: any): Promise<void> => {
-    // 1. Save Local
     await dbPut(STORE_TOOLS, { id, data });
-    trackChange();
+    trackChange('tools');
 };
 
 export const uploadToolData = async (id: string, data: any): Promise<void> => {
-    // 2. Push to Cloud (Individual Update)
-    const payload = {
-        tools: [{ id, data }]
-    };
-    
     const res = await fetch(`${API_BASE}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ tools: [{ id, data }] })
     });
-
-    if (!res.ok) {
-        throw new Error('Cloud save failed');
-    }
+    if (res.ok) updateUploadTimestamp('tools');
 };
 
 export const fetchRemoteToolData = async <T>(id: string): Promise<T | null> => {
     try {
         const res = await fetch(`${API_BASE}/tools/${id}`);
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data as T;
-    } catch {
-        return null;
-    }
+        return res.ok ? await res.json() : null;
+    } catch { return null; }
 };
 
 export const getToolData = async <T>(id: string): Promise<T | null> => {
     try {
         const item = await dbGet<{id: string, data: T}>(STORE_TOOLS, id);
         return item ? item.data : null;
-    } catch { 
-        return null;
-    }
+    } catch { return null; }
 };
