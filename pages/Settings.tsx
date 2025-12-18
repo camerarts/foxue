@@ -1,57 +1,78 @@
-
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PromptTemplate, DEFAULT_PROMPTS } from '../types';
 import * as storage from '../services/storageService';
-import { Save, RefreshCw, AlertTriangle, ClipboardPaste, Check, Maximize2, X, Loader2, Copy } from 'lucide-react';
+import { Save, RefreshCw, AlertTriangle, ClipboardPaste, Check, Maximize2, X, Loader2, Copy, Cloud, CloudCheck, AlertCircle } from 'lucide-react';
 
 const Settings: React.FC = () => {
   const [prompts, setPrompts] = useState<Record<string, PromptTemplate>>({});
   const [loading, setLoading] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'synced' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [refreshTime, setRefreshTime] = useState('');
   
-  // Track modified prompts that haven't been saved
+  // 用于标记是否已完成初始化加载，防止挂载时的初次保存
+  const isInitialized = useRef(false);
   const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(new Set());
 
-  // Define the strict display order
   const ORDERED_KEYS = [
     'SCRIPT',
     'TITLES',
     'STORYBOARD_TEXT',
-    'IMAGE_GEN_A',
-    'IMAGE_GEN_B',
     'SUMMARY',
-    'COVER_GEN',
-    'AI_TITLES_GENERATOR'
+    'COVER_GEN'
   ];
 
   useEffect(() => {
-    loadPrompts();
+    const init = async () => {
+        // 1. 检查本地是否有自定义配置
+        const localDataRaw = localStorage.getItem('lva_prompts');
+        
+        // 2. 如果本地为空，则从服务器拉取最新数据
+        if (!localDataRaw) {
+            setSyncStatus('saving');
+            try {
+                await storage.downloadAllData();
+                setSyncStatus('synced');
+            } catch (e) {
+                console.error("Failed to download initial prompts", e);
+                setSyncStatus('error');
+            }
+        }
+        
+        // 3. 加载最终数据（本地或刚下载的）
+        const data = await storage.getPrompts();
+        setPrompts(data);
+        setRefreshTime(`上次云端同步：${storage.getLastUploadTime()}`);
+        isInitialized.current = true;
+    };
+    init();
   }, []);
 
-  const loadPrompts = async () => {
-    const data = await storage.getPrompts();
-    setPrompts(data);
-    setRefreshTime(`刷新数据时间：${storage.getLastUploadTime()}`);
-  };
+  // 监听 prompts 变动，自动保存并上传
+  useEffect(() => {
+    if (!isInitialized.current) return;
 
-  const handleSaveModule = async (key: string) => {
-    setLoading(true);
-    // Since storage handles the whole object, we save all, but conceptually we are "saving the module"
-    // This cleans up the dirty state for this specific module (and technically others if we wanted, but let's be precise or broad)
-    await storage.savePrompts(prompts);
-    
-    // Clear dirty state for all, as the whole state is now persisted
-    setDirtyKeys(new Set());
-    
-    setTimeout(() => {
-      setLoading(false);
-      setMessage("配置已保存！");
-      setTimeout(() => setMessage(null), 3000);
-    }, 500);
-  };
+    const autoSave = async () => {
+        setSyncStatus('saving');
+        try {
+            // 保存到本地 IndexedDB/LocalStorage
+            await storage.savePrompts(prompts);
+            
+            // 立即同步到服务器
+            await storage.uploadPrompts();
+            
+            setSyncStatus('synced');
+            setRefreshTime(`自动保存时间：${new Date().toLocaleTimeString()}`);
+        } catch (e) {
+            console.error("Auto-sync prompts failed", e);
+            setSyncStatus('error');
+        }
+    };
+
+    const timer = setTimeout(autoSave, 1000); // 1秒防抖
+    return () => clearTimeout(timer);
+  }, [prompts]);
 
   const handlePromptChange = (key: string, value: string) => {
     setPrompts(prev => ({
@@ -66,31 +87,19 @@ const Settings: React.FC = () => {
         navigator.clipboard.writeText(text);
         setMessage("已复制到剪贴板");
         setTimeout(() => setMessage(null), 1500);
-    } else {
-        alert("无法访问剪贴板");
     }
   };
 
   const handlePaste = async (key: string) => {
-    // Check if API is available
-    if (!navigator.clipboard) {
-      alert("您的浏览器不支持自动读取剪贴板，请点击文本框后使用 Ctrl+V (或 Cmd+V) 手动粘贴。");
-      return;
-    }
-
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
         handlePromptChange(key, text);
-        setMessage("已粘贴剪贴板内容");
-        setTimeout(() => setMessage(null), 1500);
-      } else {
-        setMessage("剪贴板似乎是空的");
+        setMessage("已粘贴");
         setTimeout(() => setMessage(null), 1500);
       }
     } catch (err) {
-      console.error('Failed to read clipboard contents: ', err);
-      alert("无法访问剪贴板。请确保您已允许浏览器访问剪贴板权限，或者直接在文本框中使用快捷键粘贴。");
+      alert("无法访问剪贴板，请手动粘贴。");
     }
   };
 
@@ -99,116 +108,84 @@ const Settings: React.FC = () => {
       <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-end mb-6 md:mb-10">
         <div>
           <h1 className="text-2xl md:text-4xl font-extrabold text-slate-900 mb-0.5 md:mb-2 tracking-tight">AI 提示词配置</h1>
-          <p className="text-xs md:text-base text-slate-500 font-medium">精细化控制内容生成的每一个环节。</p>
+          <p className="text-xs md:text-base text-slate-500 font-medium">配置将实时自动保存并同步至云端。</p>
         </div>
         <div className="flex flex-col items-end gap-2">
-            <span className="hidden md:inline-block text-[10px] font-bold text-slate-400 tracking-wider bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+            <div className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border bg-white shadow-sm transition-all ${
+                syncStatus === 'synced' ? 'text-emerald-600 border-emerald-100' :
+                syncStatus === 'saving' ? 'text-blue-600 border-blue-100' :
+                syncStatus === 'error' ? 'text-rose-600 border-rose-100' :
+                'text-slate-400 border-slate-100'
+            }`}>
+                {syncStatus === 'synced' ? <CloudCheck className="w-3.5 h-3.5" /> : 
+                 syncStatus === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 
+                 syncStatus === 'error' ? <AlertCircle className="w-3.5 h-3.5" /> :
+                 <Cloud className="w-3.5 h-3.5" />}
+                {syncStatus === 'synced' ? '已同步云端' : syncStatus === 'saving' ? '保存同步中...' : syncStatus === 'error' ? '同步失败' : '就绪'}
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 tracking-wider">
                 {refreshTime}
             </span>
         </div>
       </div>
 
       {message && (
-        <div className="fixed bottom-8 right-8 bg-emerald-500 text-white px-8 py-4 rounded-xl shadow-xl animate-fade-in-up z-50 font-bold flex items-center gap-2">
-          <Check className="w-5 h-5" />
+        <div className="fixed bottom-8 right-8 bg-slate-900 text-white px-6 py-3 rounded-xl shadow-2xl animate-in slide-in-from-bottom-5 z-50 font-bold flex items-center gap-2">
+          <Check className="w-4 h-4 text-emerald-400" />
           {message}
         </div>
       )}
 
-      <div className="space-y-6 md:space-y-10">
-        <div className="bg-amber-50/50 border border-amber-100 p-5 rounded-xl flex gap-4 items-start shadow-sm">
-            <div className="p-2 bg-amber-100 rounded-lg text-amber-600 flex-shrink-0">
+      <div className="space-y-6">
+        <div className="bg-indigo-50/50 border border-indigo-100 p-5 rounded-2xl flex gap-4 items-start">
+            <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600 flex-shrink-0">
                 <AlertTriangle className="w-5 h-5" />
             </div>
             <div className="space-y-1">
-                <p className="font-bold text-amber-800 text-sm">变量使用指南</p>
-                <p className="text-xs text-amber-700/80 leading-relaxed">
-                    在提示词中使用 <code>{'{{variable}}'}</code> 语法来插入动态内容。
-                    可用变量：<code>topic</code> (主题), <code>corePoint</code> (观点), <code>script</code> (生成的脚本)。
+                <p className="font-bold text-indigo-900 text-sm">实时同步指南</p>
+                <p className="text-xs text-indigo-700/80 leading-relaxed">
+                    任何修改都会在 1 秒后自动上传至服务器。如果本地为空，系统会自动尝试恢复云端备份。
                 </p>
             </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {ORDERED_KEYS.map((key, index) => {
             const prompt = prompts[key];
             if (!prompt) return null;
-            const isDirty = dirtyKeys.has(key);
-
-            // Use system default for metadata (Name/Description) if available
-            // This ensures app updates to labels reflect immediately even if user has saved data,
-            // while preserving the user's custom template.
             const systemDef = DEFAULT_PROMPTS[key];
             const displayName = systemDef ? systemDef.name : prompt.name;
             const displayDesc = systemDef ? systemDef.description : prompt.description;
 
             return (
-              <div key={key} className="bg-white border border-slate-100 rounded-3xl p-6 md:p-8 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] relative group hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)] transition-all hover:-translate-y-1 flex flex-col">
-                
+              <div key={key} className="bg-white border border-slate-200 rounded-[32px] p-6 shadow-sm hover:shadow-md transition-all flex flex-col">
                 <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h3 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-3">
-                        <span className="flex-shrink-0 w-7 h-7 rounded-full bg-rose-500 text-white text-sm font-bold flex items-center justify-center shadow-lg shadow-rose-500/30 select-none">
-                            {index + 1}
-                        </span>
-                        {displayName}
-                        <button 
-                            onClick={() => handleCopy(prompt.template)}
-                            className="ml-1 p-1.5 text-slate-400 hover:text-violet-600 bg-transparent hover:bg-violet-50 rounded-lg transition-colors"
-                            title="复制内容"
-                        >
-                            <Copy className="w-4 h-4" />
-                        </button>
-                    </h3>
-                    <p className="text-xs font-medium text-slate-400 mt-1 pl-10">{displayDesc}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-3">
-                    {/* Key Tag */}
-                    <span className="text-[10px] font-mono font-bold bg-slate-50 text-slate-400 px-2 py-1 rounded-md border border-slate-100 hidden sm:inline-block">
-                        {key}
+                  <div className="flex items-start gap-3">
+                    <span className="w-8 h-8 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                        {index + 1}
                     </span>
-                    {/* Paste Button */}
-                    <button 
-                        onClick={() => handlePaste(key)}
-                        className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-violet-600 transition-colors bg-white hover:bg-violet-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-violet-200 shadow-sm"
-                        title="粘贴剪贴板内容"
-                    >
-                        <ClipboardPaste className="w-3.5 h-3.5" />
-                        <span>粘贴</span>
-                    </button>
+                    <div>
+                        <h3 className="text-base font-black text-slate-800 tracking-tight">{displayName}</h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{displayDesc}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                      <button onClick={() => handleCopy(prompt.template)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-xl transition-all"><Copy className="w-4 h-4" /></button>
+                      <button onClick={() => handlePaste(key)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-xl transition-all"><ClipboardPaste className="w-4 h-4" /></button>
                   </div>
                 </div>
                 
-                <div className="relative group/textarea flex-1 mb-4">
+                <div className="relative flex-1 group">
                     <textarea
                         value={prompt.template}
                         onChange={(e) => handlePromptChange(key, e.target.value)}
-                        className={`w-full h-56 rounded-2xl p-5 font-mono text-xs leading-loose outline-none transition-all resize-none selection:bg-violet-100 ${
-                            isDirty 
-                            ? 'bg-rose-50 border-2 border-rose-200 text-slate-800 focus:border-rose-400' 
-                            : 'bg-[#FAFAFA] border border-slate-200 text-slate-700 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 focus:bg-white'
-                        }`}
+                        className="w-full h-64 bg-slate-50 border border-slate-100 rounded-2xl p-5 font-mono text-xs leading-relaxed outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 focus:bg-white transition-all resize-none"
                     />
                     <button 
                         onClick={() => setExpandedKey(key)}
-                        className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur text-slate-400 hover:text-violet-600 rounded-lg shadow-sm border border-slate-200 opacity-0 group-hover/textarea:opacity-100 transition-all hover:scale-105"
-                        title="全屏编辑"
+                        className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur border border-slate-200 text-slate-400 hover:text-indigo-600 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
                     >
                         <Maximize2 className="w-4 h-4" />
-                    </button>
-                </div>
-
-                <div className="pt-2">
-                    <button
-                        onClick={() => handleSaveModule(key)}
-                        className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                            isDirty
-                            ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/30'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-500'
-                        }`}
-                    >
-                        {loading && isDirty ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                        {isDirty ? '保存配置' : '已是最新'}
                     </button>
                 </div>
               </div>
@@ -217,56 +194,20 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* Full Screen Editor Modal */}
       {expandedKey && prompts[expandedKey] && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-3xl shadow-2xl w-[90vw] h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <div>
-                        <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                            {DEFAULT_PROMPTS[expandedKey] ? DEFAULT_PROMPTS[expandedKey].name : prompts[expandedKey].name}
-                            <span className="text-sm font-medium text-slate-400 bg-white px-2 py-0.5 rounded border border-slate-200 hidden md:inline-block">{expandedKey}</span>
-                        </h2>
-                    </div>
-                    <button onClick={() => setExpandedKey(null)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
-                        <X className="w-6 h-6" />
-                    </button>
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-[40px] shadow-2xl w-[90vw] h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+                <div className="px-8 py-6 border-b flex justify-between items-center">
+                    <h2 className="text-xl font-black text-slate-800">全屏编辑: {DEFAULT_PROMPTS[expandedKey]?.name}</h2>
+                    <button onClick={() => setExpandedKey(null)} className="p-3 bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full"><X className="w-6 h-6" /></button>
                 </div>
-                <div className="flex-1 p-6 bg-[#FAFAFA]">
+                <div className="flex-1 p-8 bg-slate-50">
                     <textarea
                         autoFocus
                         value={prompts[expandedKey].template}
                         onChange={(e) => handlePromptChange(expandedKey, e.target.value)}
-                        className={`w-full h-full border rounded-2xl p-8 text-slate-800 font-mono text-sm leading-loose focus:ring-0 outline-none transition-all resize-none shadow-sm selection:bg-violet-100 ${
-                            dirtyKeys.has(expandedKey)
-                            ? 'bg-rose-50 border-rose-200'
-                            : 'bg-white border-slate-200 focus:border-violet-400'
-                        }`}
-                        placeholder="输入提示词..."
+                        className="w-full h-full bg-white border border-slate-200 rounded-3xl p-8 text-slate-800 font-mono text-sm leading-relaxed outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-inner resize-none"
                     />
-                </div>
-                <div className="px-8 py-4 border-t border-slate-100 bg-white flex justify-end gap-3">
-                    <button 
-                        onClick={() => handlePaste(expandedKey)}
-                        className="px-4 py-2 text-slate-500 hover:text-violet-600 font-bold text-sm bg-slate-50 hover:bg-violet-50 rounded-xl transition-colors border border-slate-200 hover:border-violet-200"
-                    >
-                        <ClipboardPaste className="w-4 h-4 inline mr-1.5" /> 粘贴剪贴板
-                    </button>
-                    <button 
-                        onClick={() => {
-                            if (dirtyKeys.has(expandedKey)) {
-                                handleSaveModule(expandedKey);
-                            }
-                            setExpandedKey(null);
-                        }}
-                        className={`px-6 py-2 font-bold rounded-xl transition-colors shadow-lg ${
-                            dirtyKeys.has(expandedKey)
-                            ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-rose-500/20'
-                            : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/10'
-                        }`}
-                    >
-                        {dirtyKeys.has(expandedKey) ? '保存并关闭' : '关闭'}
-                    </button>
                 </div>
             </div>
         </div>
