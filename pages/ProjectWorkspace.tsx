@@ -18,6 +18,18 @@ const formatTimestamp = (ts?: number) => {
   return `本次生成时间: ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
+const CompactTimestamp = ({ ts }: { ts?: number }) => {
+  if (!ts) return null;
+  const d = new Date(ts);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return (
+    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400/80 bg-slate-100/50 px-1.5 py-0.5 rounded border border-slate-200/50">
+      <Clock className="w-2.5 h-2.5" />
+      {pad(d.getHours())}:{pad(d.getMinutes())}
+    </div>
+  );
+};
+
 const RowCopyButton = ({ text }: { text: string }) => {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
@@ -129,7 +141,7 @@ const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnl
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col h-full max-h-[600px]">
       <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-        <div className="flex items-center gap-3"><h4 className="text-xs font-bold text-slate-500 uppercase">{title}</h4>{showStats && <span className="text-[10px] bg-white px-2 py-0.5 rounded border">{stats(val)}</span>}</div>
+        <div className="flex items-center gap-3"><h4 className="text-xs font-bold text-slate-500 uppercase">{title}</h4>{showStats && <span className="text-[10px] bg-white px-2 py-0.5 rounded border font-bold text-indigo-600 border-indigo-100">{stats(val)}</span>}</div>
         <div className="flex items-center gap-2">
             {!readOnly && onSave && dirty && <button onClick={() => { onSave(val); setDirty(false); }} className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">保存</button>}
             <RowCopyButton text={val} />
@@ -244,12 +256,11 @@ const ProjectWorkspace: React.FC = () => {
     dragStartRef.current = { x: e.clientX, y: e.clientY };
   };
 
-  const handleMouseUp = (e: React.MouseEvent) => {
+  const handleMouseUp = () => {
     setIsDragging(false);
   };
 
   const handleCanvasClick = (e: React.MouseEvent) => {
-      // If we clicked on the background (not a node), close sidebar
       if (e.target === e.currentTarget) {
           setSelectedNodeId(null);
       }
@@ -308,11 +319,17 @@ const ProjectWorkspace: React.FC = () => {
                 </svg>
                 {NODES_CONFIG.map((n, i) => {
                     const has = n.id==='input' ? !!project.title : n.id==='script' ? !!project.script : n.id==='titles' ? !!project.titles?.length : n.id==='audio_file' ? !!project.audioFile||!!pendingAudio : n.id==='summary' ? !!project.summary : !!project.coverOptions?.length;
+                    const ts = project.moduleTimestamps?.[n.id];
                     return (
                         <div key={n.id} style={{ left: n.x, top: n.y, width: NODE_WIDTH, height: NODE_HEIGHT }} onClick={(e) => { e.stopPropagation(); setSelectedNodeId(n.id); }} className={`absolute rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden bg-white hover:shadow-md ${selectedNodeId===n.id ? 'ring-2 ring-indigo-400' : has ? 'bg-emerald-50/50 border-emerald-100' : ''}`}>
                              <div className={`h-11 border-b flex items-center px-4 justify-between ${has ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
-                                 <div className="flex items-center gap-2 font-bold text-slate-700 text-sm"><n.icon className={`w-4 h-4 ${has ? 'text-emerald-500' : 'text-slate-400'}`} /> {n.label}</div>
-                                 {has && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                                 <div className="flex flex-col">
+                                     <div className="flex items-center gap-2 font-bold text-slate-700 text-sm"><n.icon className={`w-4 h-4 ${has ? 'text-emerald-500' : 'text-slate-400'}`} /> {n.label}</div>
+                                 </div>
+                                 <div className="flex items-center gap-2">
+                                     {ts && <CompactTimestamp ts={ts} />}
+                                     {has && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                                 </div>
                              </div>
                              <div className="p-4 flex flex-col justify-between flex-1">
                                 <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">{n.description}</p>
@@ -342,7 +359,8 @@ const ProjectWorkspace: React.FC = () => {
                  )}
 
                  {selectedNodeId === 'input' && <TextResultBox title="视频主题" content={project.inputs.topic} readOnly={true} />}
-                 {selectedNodeId === 'script' && <TextResultBox title="视频脚本" content={project.script} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, script: v })} autoCleanAsterisks={true} />}
+                 {/* Enabled showStats for script editor */}
+                 {selectedNodeId === 'script' && <TextResultBox title="视频脚本" content={project.script} showStats={true} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, script: v })} autoCleanAsterisks={true} />}
                  {selectedNodeId === 'audio_file' && (
                      <div className="space-y-4">
                         {(project.audioFile || pendingAudio) && <FancyAudioPlayer src={pendingAudio ? pendingAudio.url : project.audioFile} fileName={pendingAudio ? pendingAudio.file.name : '音频文件.mp3'} isLocal={!!pendingAudio} isUploading={isUploading} uploadProgress={uploadProgress} onReplace={() => audioInputRef.current?.click()} onUpload={executeAudioUpload} />}
