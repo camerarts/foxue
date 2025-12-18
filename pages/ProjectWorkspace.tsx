@@ -140,7 +140,7 @@ const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnl
   const stats = (t: string) => `【共${t.length}字符，汉字${(t.match(/[\u4e00-\u9fa5]/g) || []).length}个】`;
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col h-full max-h-[600px]">
-      <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+      <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3"><h4 className="text-xs font-bold text-slate-500 uppercase">{title}</h4>{showStats && <span className="text-[10px] bg-white px-2 py-0.5 rounded border font-bold text-indigo-600 border-indigo-100">{stats(val)}</span>}</div>
         <div className="flex items-center gap-2">
             {!readOnly && onSave && dirty && <button onClick={() => { onSave(val); setDirty(false); }} className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">保存</button>}
@@ -350,38 +350,56 @@ const ProjectWorkspace: React.FC = () => {
                 <h3 className="font-bold text-slate-800">{selectedNodeId && NODES_CONFIG.find(x => x.id === selectedNodeId)?.panelTitle}</h3>
                 <button onClick={() => setSelectedNodeId(null)} className="p-2 text-slate-400 hover:text-slate-600"><PanelRightClose className="w-5 h-5" /></button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
-                 {selectedNodeId === 'input' && <TextResultBox title="视频主题" content={project.inputs.topic} readOnly={true} />}
-                 {selectedNodeId === 'script' && <TextResultBox title="视频脚本" content={project.script} showStats={true} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, script: v })} autoCleanAsterisks={true} />}
+            <div className="flex-1 overflow-hidden bg-slate-50/50">
+                 {selectedNodeId === 'input' && <div className="p-6 h-full overflow-y-auto"><TextResultBox title="视频主题" content={project.inputs.topic} readOnly={true} /></div>}
+                 {selectedNodeId === 'script' && <div className="p-6 h-full overflow-y-auto"><TextResultBox title="视频脚本" content={project.script} showStats={true} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, script: v })} autoCleanAsterisks={true} /></div>}
                  {selectedNodeId === 'audio_file' && (
-                     <div className="space-y-4">
-                        {(project.audioFile || pendingAudio) && <FancyAudioPlayer src={pendingAudio ? pendingAudio.url : project.audioFile} fileName={pendingAudio ? pendingAudio.file.name : '音频文件.mp3'} isLocal={!!pendingAudio} isUploading={isUploading} uploadProgress={uploadProgress} onReplace={() => audioInputRef.current?.click()} onUpload={executeAudioUpload} />}
-                        {!project.audioFile && !pendingAudio && <div onClick={() => audioInputRef.current?.click()} className="h-32 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 cursor-pointer hover:bg-white transition-all"><FileAudio className="w-8 h-8" /><span className="text-xs font-bold">点击选择 MP3 文件</span></div>}
+                     <div className="flex flex-col h-full gap-4 p-6">
+                        {/* Top 2/3: Video Script for reference */}
+                        <div className="flex-[2] overflow-hidden">
+                            <TextResultBox 
+                                title="参考脚本内容" 
+                                content={project.script} 
+                                readOnly={true} 
+                                autoCleanAsterisks={true} 
+                            />
+                        </div>
+                        {/* Bottom 1/3: Audio Player / Upload Area */}
+                        <div className="flex-[1] overflow-y-auto min-h-[180px]">
+                            <div className="space-y-4">
+                                {(project.audioFile || pendingAudio) && <FancyAudioPlayer src={pendingAudio ? pendingAudio.url : project.audioFile} fileName={pendingAudio ? pendingAudio.file.name : '音频文件.mp3'} isLocal={!!pendingAudio} isUploading={isUploading} uploadProgress={uploadProgress} onReplace={() => audioInputRef.current?.click()} onUpload={executeAudioUpload} />}
+                                {!project.audioFile && !pendingAudio && <div onClick={() => audioInputRef.current?.click()} className="h-32 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 cursor-pointer hover:bg-white transition-all"><FileAudio className="w-8 h-8" /><span className="text-xs font-bold">点击选择 MP3 文件</span></div>}
+                            </div>
+                        </div>
                      </div>
                  )}
                  {selectedNodeId === 'titles' && (
-                     <div className="space-y-3">
-                         {project.titles?.map((t, i) => (
-                             <div key={i} className="bg-white p-4 rounded-xl border flex justify-between items-center group">
-                                 <div className="font-bold text-slate-700 text-sm">{t.title}</div>
-                                 <RowCopyButton text={t.title} />
-                             </div>
-                         ))}
+                     <div className="p-6 h-full overflow-y-auto">
+                        <div className="space-y-3">
+                            {project.titles?.map((t, i) => (
+                                <div key={i} className="bg-white p-4 rounded-xl border flex justify-between items-center group">
+                                    <div className="font-bold text-slate-700 text-sm">{t.title}</div>
+                                    <RowCopyButton text={t.title} />
+                                </div>
+                            ))}
+                        </div>
                      </div>
                  )}
-                 {selectedNodeId === 'summary' && <TextResultBox title="简介标签" content={project.summary} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, summary: v })} />}
+                 {selectedNodeId === 'summary' && <div className="p-6 h-full overflow-y-auto"><TextResultBox title="简介标签" content={project.summary} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, summary: v })} /></div>}
                  {selectedNodeId === 'cover' && (
-                     <div className="space-y-4">
-                         {project.coverOptions?.map((o, i) => (
-                             <div key={i} className="bg-white rounded-xl border overflow-hidden">
-                                 <div className="bg-slate-50 px-4 py-2 border-b text-[10px] font-black uppercase text-slate-400 tracking-widest">方案 {i+1}</div>
-                                 <div className="p-4 space-y-3">
-                                     <div className="text-lg font-black text-slate-800 leading-tight">{o.titleTop}</div>
-                                     <div className="text-sm font-bold text-slate-500">{o.titleBottom}</div>
-                                     <div className="pt-2 text-[10px] text-slate-400 italic">视觉: {o.visual}</div>
-                                 </div>
-                             </div>
-                         ))}
+                     <div className="p-6 h-full overflow-y-auto">
+                        <div className="space-y-4">
+                            {project.coverOptions?.map((o, i) => (
+                                <div key={i} className="bg-white rounded-xl border overflow-hidden">
+                                    <div className="bg-slate-50 px-4 py-2 border-b text-[10px] font-black uppercase text-slate-400 tracking-widest">方案 {i+1}</div>
+                                    <div className="p-4 space-y-3">
+                                        <div className="text-lg font-black text-slate-800 leading-tight">{o.titleTop}</div>
+                                        <div className="text-sm font-bold text-slate-500">{o.titleBottom}</div>
+                                        <div className="pt-2 text-[10px] text-slate-400 italic">视觉: {o.visual}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                      </div>
                  )}
             </div>
