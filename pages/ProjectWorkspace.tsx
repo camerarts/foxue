@@ -26,36 +26,16 @@ const RowCopyButton = ({ text }: { text: string }) => {
   );
 };
 
-// --- Clean Modern Audio Player (Redesigned) ---
-const FancyAudioPlayer = ({ 
-    src, 
-    fileName, 
-    isLocal, 
-    onReplace, 
-    onDelete, 
-    isUploading, 
-    uploadProgress,
-    onUpload 
-}: { 
-    src: string, 
-    fileName: string, 
-    isLocal: boolean, 
-    onReplace: () => void, 
-    onDelete?: () => void,
-    isUploading?: boolean,
-    uploadProgress?: number,
-    onUpload?: () => void
-}) => {
+const FancyAudioPlayer = ({ src, fileName, isLocal, onReplace, onDelete, isUploading, uploadProgress, onUpload }: any) => {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
 
-    // Generate stable visualizer bars
     const bars = useMemo(() => Array.from({ length: 12 }).map(() => ({
-        delay: Math.random() * -1, // Negative delay for immediate offset start
-        duration: 0.6 + Math.random() * 0.8 // Random duration between 0.6s and 1.4s
+        delay: Math.random() * -1,
+        duration: 0.6 + Math.random() * 0.8
     })), []);
 
     useEffect(() => {
@@ -79,344 +59,112 @@ const FancyAudioPlayer = ({
 
     const togglePlay = () => {
         if (!audioRef.current) return;
-        if (isPlaying) audioRef.current.pause();
-        else audioRef.current.play();
+        if (isPlaying) audioRef.current.pause(); else audioRef.current.play();
         setIsPlaying(!isPlaying);
     };
 
-    const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSeek = (e: any) => {
         if (!audioRef.current) return;
         const newTime = (Number(e.target.value) / 100) * duration;
         audioRef.current.currentTime = newTime;
         setProgress(Number(e.target.value));
     };
 
-    const handleDownload = () => {
-        const a = document.createElement('a');
-        a.href = src;
-        a.download = fileName || 'audio.mp3';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-    };
-
     const formatTime = (time: number) => {
         if (isNaN(time)) return "00:00";
-        const minutes = Math.floor(time / 60);
-        const seconds = Math.floor(time % 60);
-        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        const m = Math.floor(time / 60);
+        const s = Math.floor(time % 60);
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
     return (
-        <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
-             <style>{`
-                @keyframes music-bar-bounce {
-                    0%, 100% { height: 4px; opacity: 0.5; }
-                    50% { height: 100%; opacity: 1; }
-                }
-             `}</style>
-             <audio ref={audioRef} src={src} preload="metadata" />
-
-             {/* Top Info Section */}
+        <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+             <style>{`@keyframes music-bar-bounce { 0%, 100% { height: 4px; opacity: 0.5; } 50% { height: 100%; opacity: 1; } }`}</style>
+             <audio ref={audioRef} src={src} />
              <div className="flex items-start justify-between mb-6">
                  <div className="flex items-center gap-4">
-                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${isPlaying ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-400'}`}>
-                         <Music4 className={`w-7 h-7 ${isPlaying ? 'animate-pulse' : ''}`} />
+                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${isPlaying ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-400'}`}>
+                         <Music4 className="w-7 h-7" />
                      </div>
-                     <div>
-                         <h4 className="text-base font-bold text-slate-800 line-clamp-1" title={fileName}>
-                             {fileName}
-                         </h4>
-                         <div className="flex items-center gap-2 mt-1">
-                            {isLocal ? (
-                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">待上传</span>
-                            ) : (
-                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">云端存储</span>
-                            )}
-                            <span className="text-xs text-slate-400 font-medium tracking-wide">MP3 Audio</span>
-                         </div>
-                     </div>
+                     <div><h4 className="text-base font-bold text-slate-800 line-clamp-1">{fileName}</h4><span className="text-[10px] text-slate-400">{isLocal ? '待上传' : '已存云端'}</span></div>
                  </div>
-                 
-                 {/* Visualizer Bars (Smooth CSS Animation) */}
-                 <div className="hidden sm:flex items-center gap-0.5 h-8">
-                    {bars.map((bar, i) => (
-                        <div 
-                            key={i} 
-                            className={`w-1 bg-indigo-500 rounded-full transition-all duration-300`}
-                            style={{ 
-                                height: isPlaying ? 'auto' : '4px',
-                                animation: isPlaying ? `music-bar-bounce ${bar.duration}s ease-in-out infinite` : 'none',
-                                animationDelay: `${bar.delay}s`,
-                                opacity: isPlaying ? 1 : 0.2
-                            }} 
-                        />
-                    ))}
+                 <div className="flex items-center gap-0.5 h-8">
+                    {bars.map((bar, i) => (<div key={i} className="w-1 bg-indigo-500 rounded-full" style={{ animation: isPlaying ? `music-bar-bounce ${bar.duration}s infinite` : 'none', animationDelay: `${bar.delay}s` }} />))}
                  </div>
              </div>
-
-             {/* Progress Section */}
-             <div className="mb-6">
-                 <div className="relative w-full h-2 bg-slate-100 rounded-full cursor-pointer group mb-2">
-                      <div 
-                         className="absolute top-0 left-0 h-full bg-indigo-600 rounded-full transition-all group-hover:bg-indigo-500" 
-                         style={{ width: `${progress}%` }}
-                     />
-                      {/* Thumb */}
-                      <div 
-                         className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-indigo-600 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                         style={{ left: `${progress}%`, marginLeft: '-6px' }}
-                      />
-                      <input 
-                         type="range" 
-                         min="0" 
-                         max="100" 
-                         value={progress} 
-                         onChange={handleSeek}
-                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                     />
-                 </div>
-                 <div className="flex justify-between text-xs font-bold text-slate-400 font-mono">
-                     <span>{formatTime(currentTime)}</span>
-                     <span>{formatTime(duration)}</span>
+             <div className="relative w-full h-1.5 bg-slate-100 rounded-full mb-2">
+                <div className="absolute top-0 left-0 h-full bg-indigo-600 rounded-full" style={{ width: `${progress}%` }} />
+                <input type="range" min="0" max="100" value={progress} onChange={handleSeek} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+             </div>
+             <div className="flex justify-between text-[10px] font-mono text-slate-400"><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div>
+             <div className="flex items-center justify-between mt-4">
+                 <button onClick={togglePlay} className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center hover:scale-105 transition-all">{isPlaying ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white ml-1" />}</button>
+                 <div className="flex gap-1 bg-slate-50 p-1 rounded-lg">
+                    <button onClick={onReplace} className="p-2 text-slate-500 hover:text-indigo-600"><RefreshCw className="w-4 h-4" /></button>
+                    {onDelete && <button onClick={onDelete} className="p-2 text-slate-500 hover:text-rose-500"><Trash2 className="w-4 h-4" /></button>}
                  </div>
              </div>
-
-             {/* Controls & Actions */}
-             <div className="flex items-center justify-between">
-                 
-                 {/* Play Button */}
-                 <button 
-                     onClick={togglePlay}
-                     className="w-14 h-14 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-indigo-600 hover:scale-105 transition-all shadow-lg shadow-slate-900/20 active:scale-95"
-                 >
-                     {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-1" />}
-                 </button>
-
-                 {/* Actions Toolbar */}
-                 <div className="flex items-center gap-1 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-                     <button 
-                        onClick={handleDownload} 
-                        className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"
-                        title="下载音频"
-                     >
-                         <Download className="w-4 h-4" />
-                     </button>
-                     <div className="w-px h-4 bg-slate-200 mx-1"></div>
-                     <button 
-                        onClick={onReplace} 
-                        className="p-2.5 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"
-                        title="替换文件"
-                     >
-                         <RefreshCw className="w-4 h-4" />
-                     </button>
-                     {onDelete && (
-                         <button 
-                            onClick={onDelete} 
-                            className="p-2.5 text-slate-500 hover:text-rose-500 hover:bg-white rounded-lg transition-all"
-                            title="删除"
-                         >
-                              <Trash2 className="w-4 h-4" />
-                         </button>
-                     )}
-                 </div>
-             </div>
-
-             {/* Upload Action (Only Local) */}
              {isLocal && (
-                 <div className="mt-6 pt-5 border-t border-slate-100 animate-in slide-in-from-top-2">
-                      {isUploading ? (
-                          <div className="flex items-center gap-4">
-                              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                  <div className="h-full bg-indigo-500 rounded-full transition-all duration-300" style={{width: `${uploadProgress}%`}}></div>
-                              </div>
-                              <span className="text-xs font-bold text-indigo-600 w-10 text-right">{Math.round(uploadProgress || 0)}%</span>
-                          </div>
-                      ) : (
-                          <button 
-                             onClick={onUpload}
-                             className="w-full py-3 bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-sm font-bold rounded-xl hover:shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 active:scale-[0.99]"
-                          >
-                             <CloudUpload className="w-4 h-4" /> 上传到云端
-                          </button>
-                      )}
-                 </div>
+                 <button onClick={onUpload} className="w-full mt-6 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2">
+                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />} {isUploading ? `${Math.round(uploadProgress)}%` : '上传云端'}
+                 </button>
              )}
         </div>
     );
 };
 
-interface TextResultBoxProps {
-    content: string;
-    title: string;
-    onSave?: (val: string) => void;
-    placeholder?: string;
-    showStats?: boolean;
-    readOnly?: boolean;
-    autoCleanAsterisks?: boolean;
-}
-
-const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnly, autoCleanAsterisks }: TextResultBoxProps) => {
-  // Helper to remove asterisks if autoCleanAsterisks is enabled
-  const cleanText = (txt: string) => autoCleanAsterisks ? txt.replace(/\*/g, '') : txt;
-
-  const [value, setValue] = useState(cleanText(content || ''));
-  const [isDirty, setIsDirty] = useState(false);
-
-  useEffect(() => {
-    if (!isDirty) setValue(cleanText(content || ''));
-  }, [content, isDirty, autoCleanAsterisks]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setValue(cleanText(e.target.value));
-    setIsDirty(true);
-  };
-
-  const handleSave = () => {
-    if (onSave) {
-        onSave(value);
-        setIsDirty(false);
-    }
-  };
-
-  const calculateStats = (text: string) => {
-      const totalChars = text.length;
-      const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
-      return `【共${totalChars}字符，共${chineseChars}个汉字】`;
-  };
-
+const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnly, autoCleanAsterisks }: any) => {
+  const clean = (t: string) => autoCleanAsterisks ? t.replace(/\*/g, '') : t;
+  const [val, setVal] = useState(clean(content || ''));
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => { if (!dirty) setVal(clean(content || '')); }, [content, dirty]);
+  const stats = (t: string) => `【共${t.length}字符，汉字${(t.match(/[\u4e00-\u9fa5]/g) || []).length}个】`;
   return (
-    <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden flex flex-col h-full max-h-[600px]">
-      <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
-        <div className="flex items-center gap-3">
-             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">{title}</h4>
-             {showStats && (
-                 <span className="text-[10px] text-slate-500 font-medium bg-white px-2 py-0.5 rounded border border-slate-200">
-                    {calculateStats(value)}
-                 </span>
-             )}
-        </div>
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col h-full max-h-[600px]">
+      <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+        <div className="flex items-center gap-3"><h4 className="text-xs font-bold text-slate-500 uppercase">{title}</h4>{showStats && <span className="text-[10px] bg-white px-2 py-0.5 rounded border">{stats(val)}</span>}</div>
         <div className="flex items-center gap-2">
-            {!readOnly && onSave && isDirty && (
-                 <button onClick={handleSave} className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded hover:bg-emerald-100">
-                    <Check className="w-3 h-3" /> 保存
-                 </button>
-            )}
-            <RowCopyButton text={value} />
+            {!readOnly && onSave && dirty && <button onClick={() => { onSave(val); setDirty(false); }} className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">保存</button>}
+            <RowCopyButton text={val} />
         </div>
       </div>
       {onSave && !readOnly ? (
-        <textarea 
-            className="flex-1 w-full p-4 text-sm text-slate-700 leading-relaxed outline-none resize-none bg-white focus:bg-slate-50/50 transition-colors font-mono"
-            value={value}
-            onChange={handleChange}
-            placeholder={placeholder || "在此输入或生成内容..."}
-        />
+        <textarea className="flex-1 w-full p-4 text-sm text-slate-700 leading-relaxed outline-none resize-none font-mono" value={val} onChange={(e) => { setVal(clean(e.target.value)); setDirty(true); }} placeholder={placeholder} />
       ) : (
-        <div className="p-4 overflow-y-auto whitespace-pre-wrap text-sm text-slate-700 leading-relaxed flex-1 font-mono">
-          {content || <span className="text-slate-400 italic">暂无内容</span>}
-        </div>
+        <div className="p-4 overflow-y-auto whitespace-pre-wrap text-sm text-slate-700 leading-relaxed flex-1 font-mono">{content || <span className="text-slate-300 italic">暂无内容</span>}</div>
       )}
     </div>
   );
 };
 
-// --- Configuration ---
-
 const NODE_WIDTH = 280;
 const NODE_HEIGHT = 160;
-
-// Workflow Layout Definition
 const NODES_CONFIG = [
   { id: 'input', label: '项目输入', panelTitle: '项目策划', icon: Layout, color: 'blue', description: '定义主题与基调', x: 50, y: 300 },
-  { id: 'script', label: '视频脚本', panelTitle: '脚本编辑器', icon: FileText, color: 'violet', promptKey: 'SCRIPT', description: '生成完整口播文案', model: 'Gemini 2.5', x: 450, y: 300 },
-  { id: 'titles', label: '爆款标题', panelTitle: '标题策划', icon: Type, color: 'amber', promptKey: 'TITLES', description: '生成高点击率标题', model: 'Gemini 2.5', x: 850, y: 100 },
-  { id: 'audio_file', label: '上传MP3文件', panelTitle: '上传音频文件', icon: FileAudio, color: 'fuchsia', description: '上传配音/BGM文件', x: 850, y: 300 },
-  { id: 'summary', label: '简介与标签', panelTitle: '发布元数据', icon: List, color: 'emerald', promptKey: 'SUMMARY', description: 'SEO 简介与标签', model: 'Gemini 2.5', x: 850, y: 500 },
-  { id: 'cover', label: '封面策划', panelTitle: '封面方案', icon: Palette, color: 'rose', promptKey: 'COVER_GEN', description: '画面描述与文案', model: 'Gemini 2.5', x: 850, y: 700 },
+  { id: 'script', label: '视频脚本', panelTitle: '脚本编辑器', icon: FileText, color: 'violet', promptKey: 'SCRIPT', description: '生成完整口播文案', x: 450, y: 300 },
+  { id: 'titles', label: '爆款标题', panelTitle: '标题策划', icon: Type, color: 'amber', promptKey: 'TITLES', description: '生成高点击率标题', x: 850, y: 100 },
+  { id: 'audio_file', label: '上传MP3', panelTitle: '音频文件', icon: FileAudio, color: 'fuchsia', description: '上传配音/BGM', x: 850, y: 300 },
+  { id: 'summary', label: '简介标签', panelTitle: '发布元数据', icon: List, color: 'emerald', promptKey: 'SUMMARY', description: 'SEO 简介与标签', x: 850, y: 500 },
+  { id: 'cover', label: '封面策划', panelTitle: '封面方案', icon: Palette, color: 'rose', promptKey: 'COVER_GEN', description: '画面描述与文案', x: 850, y: 700 },
 ];
-
-const CONNECTIONS = [
-  { from: 'input', to: 'script' },
-  { from: 'script', to: 'audio_file' },
-  { from: 'script', to: 'titles' },
-  { from: 'script', to: 'summary' },
-  { from: 'script', to: 'cover' },
-];
-
-// --- Main Component ---
+const CONNECTIONS = [ { from: 'input', to: 'script' }, { from: 'script', to: 'audio_file' }, { from: 'script', to: 'titles' }, { from: 'script', to: 'summary' }, { from: 'script', to: 'cover' } ];
 
 const ProjectWorkspace: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [project, setProject] = useState<ProjectData | null>(null);
   const [loading, setLoading] = useState(true);
-  
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [generatingNodes, setGeneratingNodes] = useState<Set<string>>(new Set());
   const [prompts, setPrompts] = useState<Record<string, PromptTemplate>>({});
-  
-  // Audio Upload State
   const [isUploading, setIsUploading] = useState(false);
-  const [audioUploadProgress, setAudioUploadProgress] = useState(0);
-  const [pendingAudio, setPendingAudio] = useState<{file: File, url: string} | null>(null);
-  const audioInputRef = useRef<HTMLInputElement>(null);
-
-  // Canvas State
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [pendingAudio, setPendingAudio] = useState<any>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
-  const [isDragging, setIsDragging] = useState(false);
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const dragStartRef = useRef({ x: 0, y: 0 });
-
-  // Sync Status
-  const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'synced' | 'error' | null>(null);
-  const [lastSyncTime, setLastSyncTime] = useState('');
-  
-  // API Config State
+  const [syncStatus, setSyncStatus] = useState<any>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [customKey, setCustomKey] = useState('');
-
-  // Activity Tracking Refs
-  const lastActivityRef = useRef(Date.now());
-  const isBusyRef = useRef(false);
-
-  // Update busy ref based on state
-  useEffect(() => {
-      isBusyRef.current = loading || generatingNodes.size > 0 || isUploading;
-  }, [loading, generatingNodes, isUploading]);
-
-  useEffect(() => {
-    const updateActivity = () => { lastActivityRef.current = Date.now(); };
-    window.addEventListener('click', updateActivity);
-    window.addEventListener('keydown', updateActivity);
-    return () => {
-        window.removeEventListener('click', updateActivity);
-        window.removeEventListener('keydown', updateActivity);
-    };
-  }, []);
-
-  // Auto Sync Loop
-  useEffect(() => {
-      let timeoutId: ReturnType<typeof setTimeout>;
-      const performSync = async () => {
-          const isUserActive = (Date.now() - lastActivityRef.current) < 30000;
-          if (isBusyRef.current || isUserActive) {
-              timeoutId = setTimeout(performSync, 2 * 60 * 1000);
-              return;
-          }
-          setSyncStatus('saving');
-          try {
-              await storage.uploadProjects();
-              setSyncStatus('synced');
-              setLastSyncTime(new Date().toLocaleTimeString());
-          } catch (e) {
-              setSyncStatus('error');
-          }
-          timeoutId = setTimeout(performSync, 5 * 60 * 1000);
-      };
-      timeoutId = setTimeout(performSync, 5 * 60 * 1000);
-      return () => clearTimeout(timeoutId);
-  }, []);
+  const audioInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -425,718 +173,168 @@ const ProjectWorkspace: React.FC = () => {
             if (p) setProject(p);
             setLoading(false);
         }
-        const loadedPrompts = await storage.getPrompts();
-        setPrompts(loadedPrompts);
-
-        // Load custom API key from local storage
-        const storedKey = localStorage.getItem('lva_custom_api_key');
-        if (storedKey) setCustomKey(storedKey);
+        setPrompts(await storage.getPrompts());
+        setCustomKey(localStorage.getItem('lva_custom_api_key') || '');
     };
     init();
   }, [id]);
 
-  const saveApiSettings = () => {
-      localStorage.setItem('lva_custom_api_key', customKey);
-      setShowConfigModal(false);
-      alert("API 配置已保存。");
-  };
-
-  const getMaskedKey = (key: string) => {
-      if (!key || key.length < 8) return '';
-      return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
-  };
-
-  const handlePasteApi = async () => {
+  const updateProjectAndSyncImmediately = async (updated: ProjectData) => {
+      setProject(updated);
+      await storage.saveProject(updated);
+      setSyncStatus('saving');
       try {
-          const text = await navigator.clipboard.readText();
-          if (text) setCustomKey(text.trim());
-      } catch (err) {
-          // Fallback mechanism could be added here if needed
-          console.error("Failed to read clipboard");
-          alert("无法读取剪贴板，请手动粘贴。");
-      }
+          await storage.uploadProjects();
+          setSyncStatus('synced');
+      } catch { setSyncStatus('error'); }
   };
 
-  const triggerBackgroundSync = () => {
-       setSyncStatus('saving');
-       storage.uploadProjects().then(() => {
-           setSyncStatus('synced');
-           setLastSyncTime(new Date().toLocaleTimeString());
-       }).catch(() => setSyncStatus('error'));
-  };
-
-  const updateProjectField = async (field: keyof ProjectData, value: any) => {
+  const handleNodeAction = async (nodeId: string) => {
     if (!project) return;
-    
-    // Update timestamp if manual edit corresponds to a node
-    const timestamps = { ...(project.moduleTimestamps || {}) };
-    if (field === 'script') timestamps['script'] = Date.now();
-    if (field === 'summary') timestamps['summary'] = Date.now();
+    if (nodeId === 'audio_file') { audioInputRef.current?.click(); return; }
+    if (['titles', 'summary', 'cover'].includes(nodeId) && !project.script) { alert("请先生成脚本"); return; }
 
-    const updated = { ...project, [field]: value, moduleTimestamps: timestamps };
-    setProject(updated);
-    await storage.saveProject(updated);
-    triggerBackgroundSync();
-  };
+    setGeneratingNodes(prev => new Set(prev).add(nodeId));
+    try {
+        let update: any = {};
+        const config = NODES_CONFIG.find(n => n.id === nodeId);
+        const template = config?.promptKey ? prompts[config.promptKey]?.template : '';
 
-  const handleAudioFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 100 * 1024 * 1024) { alert('文件过大'); return; }
-    if (pendingAudio?.url) URL.revokeObjectURL(pendingAudio.url);
-    const url = URL.createObjectURL(file);
-    setPendingAudio({ file, url });
-    if (audioInputRef.current) audioInputRef.current.value = '';
+        if (nodeId === 'script') {
+            let text = await gemini.generateText(prompts['SCRIPT'].template.replace(/\{\{topic\}\}/g, project.inputs.topic || project.title).replace(/\{\{tone\}\}/g, project.inputs.tone).replace(/\{\{language\}\}/g, project.inputs.language), customKey);
+            update = { script: text.replace(/\*/g, '') };
+        } else if (nodeId === 'titles') {
+            update = { titles: await gemini.generateJSON(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''), undefined, customKey) };
+        } else if (nodeId === 'summary') {
+            let text = (await gemini.generateText(template.replace(/\{\{script\}\}/g, project.script || ''), customKey)).trim();
+            if (!text) throw new Error("AI 返回内容为空");
+            update = { summary: text.replace(/\*/g, '') };
+        } else if (nodeId === 'cover') {
+            const schema = { type: "ARRAY", items: { type: "OBJECT", properties: { visual: { type: "STRING" }, titleTop: { type: "STRING" }, titleBottom: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["visual", "titleTop", "titleBottom"] } };
+            update = { coverOptions: await gemini.generateJSON(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''), schema, customKey) };
+        }
+
+        const now = Date.now();
+        const nextProject = { ...project, ...update, moduleTimestamps: { ...(project.moduleTimestamps || {}), [nodeId]: now } };
+        await updateProjectAndSyncImmediately(nextProject);
+
+    } catch (e: any) { alert(`生成失败: ${e.message}`); } finally { setGeneratingNodes(prev => { const n = new Set(prev); n.delete(nodeId); return n; }); }
   };
 
   const executeAudioUpload = async () => {
       if (!pendingAudio || !project) return;
       setIsUploading(true);
       try {
-          const cloudUrl = await storage.uploadFile(pendingAudio.file, project.id, (p) => setAudioUploadProgress(p));
-          
-          // Update timestamp
-          const ts = Date.now();
-          const timestamps = { ...(project.moduleTimestamps || {}), audio_file: ts };
-          
-          const updated = { ...project, audioFile: cloudUrl, moduleTimestamps: timestamps };
-          setProject(updated);
-          await storage.saveProject(updated);
+          const url = await storage.uploadFile(pendingAudio.file, project.id, p => setUploadProgress(p));
+          await updateProjectAndSyncImmediately({ ...project, audioFile: url, moduleTimestamps: { ...(project.moduleTimestamps || {}), audio_file: Date.now() } });
           setPendingAudio(null);
-          triggerBackgroundSync();
-      } catch(e) { alert('上传失败'); }
-      setIsUploading(false);
+      } catch { alert('上传失败'); } finally { setIsUploading(false); }
   };
 
-  const handleNodeAction = async (nodeId: string) => {
-    if (!project) return;
-    
-    // Audio is special - just open file dialog
-    if (nodeId === 'audio_file') {
-        audioInputRef.current?.click();
-        return;
-    }
-
-    // Check dependency: most nodes need Script first (except input and script itself)
-    if (['titles', 'summary', 'cover'].includes(nodeId) && !project.script) {
-        alert("请先生成视频脚本");
-        return;
-    }
-
-    setGeneratingNodes(prev => new Set(prev).add(nodeId));
-
-    try {
-        let update: Partial<ProjectData> = {};
-        const nodeConfig = NODES_CONFIG.find(n => n.id === nodeId);
-        if (!nodeConfig) return;
-
-        const promptKey = nodeConfig.promptKey;
-        const promptTemplate = promptKey ? prompts[promptKey]?.template : '';
-
-        if (!promptTemplate && nodeId !== 'script') {
-             throw new Error("Prompt template missing");
-        }
-
-        // Logic based on Node ID
-        if (nodeId === 'script') {
-             const inputPrompt = prompts['SCRIPT']?.template 
-                .replace(/\{\{topic\}\}/g, project.inputs.topic || project.title)
-                .replace(/\{\{tone\}\}/g, project.inputs.tone)
-                .replace(/\{\{language\}\}/g, project.inputs.language) || '';
-            
-            let text = await gemini.generateText(inputPrompt, customKey);
-            text = text.replace(/\*/g, '');
-            update = { script: text };
-        } else if (nodeId === 'titles') {
-             const p = promptTemplate
-                .replace(/\{\{title\}\}/g, project.title)
-                .replace(/\{\{script\}\}/g, project.script || '');
-             const data = await gemini.generateJSON<TitleItem[]>(p, undefined, customKey);
-             update = { titles: data };
-        } else if (nodeId === 'summary') {
-             const p = promptTemplate.replace(/\{\{script\}\}/g, project.script || '');
-             let text = await gemini.generateText(p, customKey);
-             // Ensure it's not empty and clean it
-             text = text.trim();
-             if (!text) throw new Error("AI 返回了空总结内容，请稍后重试。");
-             text = text.replace(/\*/g, ''); // Clean asterisks
-             update = { summary: text };
-        } else if (nodeId === 'cover') {
-             const p = promptTemplate
-                .replace(/\{\{title\}\}/g, project.title)
-                .replace(/\{\{script\}\}/g, project.script || '');
-             
-             const schema = {
-                type: "ARRAY",
-                items: {
-                  type: "OBJECT",
-                  properties: {
-                    visual: { type: "STRING" },
-                    titleTop: { type: "STRING" },
-                    titleBottom: { type: "STRING" },
-                    score: { type: "NUMBER" }
-                  },
-                  required: ["visual", "titleTop", "titleBottom"]
-                }
-             };
-
-             const data = await gemini.generateJSON<CoverOption[]>(p, schema, customKey);
-             update = { coverOptions: data };
-        }
-
-        // Use functional update to ensure thread safety
-        setProject(prev => {
-            if (!prev) return null;
-            const now = Date.now();
-            const timestamps = { ...(prev.moduleTimestamps || {}), [nodeId]: now };
-            const nextProject = { ...prev, ...update, moduleTimestamps: timestamps };
-            
-            // Side effect to persist
-            storage.saveProject(nextProject).then(() => triggerBackgroundSync());
-            
-            return nextProject;
-        });
-        
-    } catch (e: any) {
-        console.error(e);
-        alert(`生成失败: ${e.message}`);
-    } finally {
-        setGeneratingNodes(prev => { const n = new Set(prev); n.delete(nodeId); return n; });
-    }
-  };
-
-  const handleOneClickStart = async () => {
-    if (!project) return;
-    if (!project.script) {
-        alert("请先生成视频脚本，然后才能一键生成后续内容。");
-        return;
-    }
-
-    // Targets: Titles, Summary, Cover
-    const targets = [
-        { id: 'titles', hasData: !!project.titles && project.titles.length > 0 },
-        { id: 'summary', hasData: !!project.summary && project.summary.trim().length > 0 },
-        { id: 'cover', hasData: !!project.coverOptions && project.coverOptions.length > 0 }
-    ];
-
-    const toGenerate = targets.filter(t => !t.hasData);
-    if (toGenerate.length === 0) {
-        alert("所有板块均已生成，无需操作。");
-        return;
-    }
-
-    // Fire concurrently
-    toGenerate.forEach(t => handleNodeAction(t.id));
-  };
-
-  const getCurvePath = (start: {x:number, y:number}, end: {x:number, y:number}) => {
-      const sx = start.x + NODE_WIDTH;
-      const sy = start.y + NODE_HEIGHT / 2;
-      const ex = end.x;
-      const ey = end.y + NODE_HEIGHT / 2;
-      return `M ${sx} ${sy} C ${sx + (ex - sx) / 2} ${sy} ${ex - (ex - sx) / 2} ${ey} ${ex} ${ey}`;
-  };
-
-  const formatTime = (ts?: number) => {
-    if (!ts) return '';
-    const date = new Date(ts);
-    const today = new Date();
-    const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
-    if (isToday) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
-  };
-
-  if (loading || !project) return <div className="flex justify-center items-center h-full text-slate-500 font-bold">加载中...</div>;
+  if (loading || !project) return <div className="flex h-full items-center justify-center text-slate-400 font-bold">加载中...</div>;
 
   return (
-    <div className="flex h-full relative overflow-hidden bg-slate-50">
-        
-        {/* Hidden Audio Input for Trigger */}
-        <input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={handleAudioFileSelect} />
-
-        {/* Top Left Project Title with Back Button */}
+    <div className="flex h-full relative bg-slate-50 overflow-hidden">
+        <input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) setPendingAudio({ file: f, url: URL.createObjectURL(f) }); }} />
         <div className="absolute top-6 left-6 z-20 flex items-center gap-3">
-             <button 
-                onClick={() => navigate('/dashboard')} 
-                className="p-2 bg-white/50 hover:bg-white rounded-full shadow-sm backdrop-blur-sm transition-all border border-slate-200/50 hover:border-slate-300 group"
-                title="返回仪表盘"
-             >
-                 <ArrowLeft className="w-5 h-5 text-slate-500 group-hover:text-slate-800" />
-             </button>
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight opacity-50 select-none pointer-events-none">
-                {project.title || '未命名项目'}
-            </h1>
+             <button onClick={() => navigate('/dashboard')} className="p-2 bg-white/50 rounded-full border hover:bg-white transition-all"><ArrowLeft className="w-5 h-5 text-slate-500" /></button>
+             <h1 className="text-2xl font-black text-slate-400 select-none">{project.title}</h1>
         </div>
-
-        {/* Top Right Buttons: API Config, Sync, One Click */}
         <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
-             {/* API Config Button */}
-            <button
-                onClick={() => setShowConfigModal(true)}
-                className={`h-9 px-3 rounded-lg font-bold text-xs flex items-center gap-2 transition-all shadow-sm border backdrop-blur-sm ${customKey ? 'bg-indigo-50/90 text-indigo-600 border-indigo-200' : 'bg-white/80 text-slate-600 border-slate-200 hover:border-slate-300'}`}
-                title="API 配置"
-            >
-                <Settings2 className="w-4 h-4" />
-                <span className="hidden sm:inline">API</span>
-            </button>
-
-            {/* Sync Badge */}
-            <div className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border shadow-sm backdrop-blur-sm transition-colors ${
-                syncStatus === 'synced' ? 'bg-emerald-50/90 text-emerald-600 border-emerald-100' :
-                syncStatus === 'saving' ? 'bg-blue-50/90 text-blue-600 border-blue-100' :
-                syncStatus === 'error' ? 'bg-rose-50/90 text-rose-600 border-rose-100' :
-                'bg-slate-50/90 text-slate-400 border-slate-100'
-            }`}>
-                {syncStatus === 'synced' ? <CloudCheck className="w-3.5 h-3.5" /> : 
-                 syncStatus === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 
-                 syncStatus === 'error' ? <AlertCircle className="w-3.5 h-3.5" /> :
-                 <Cloud className="w-3.5 h-3.5" />}
-                
-                {syncStatus === 'synced' ? `已同步云端: ${lastSyncTime}` :
-                 syncStatus === 'saving' ? '正在同步...' :
-                 syncStatus === 'error' ? '同步失败' :
-                 '准备就绪'}
+            <button onClick={() => setShowConfigModal(true)} className="h-9 px-3 bg-white/80 border rounded-lg flex items-center gap-2 text-xs font-bold"><Settings2 className="w-4 h-4" /> API</button>
+            <div className={`text-[10px] font-bold px-3 py-1.5 rounded-full border bg-white/90 shadow-sm flex items-center gap-1.5 ${syncStatus === 'synced' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                {syncStatus === 'saving' ? <Loader2 className="w-3 h-3 animate-spin" /> : syncStatus === 'synced' ? <CloudCheck className="w-3 h-3" /> : <Cloud className="w-3 h-3" />}
+                {syncStatus === 'saving' ? '保存同步中...' : syncStatus === 'synced' ? '已同步云端' : '就绪'}
             </div>
-
-            <button
-                onClick={handleOneClickStart}
-                disabled={generatingNodes.size > 0}
-                className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2 text-sm disabled:opacity-50 disabled:transform-none disabled:shadow-none"
-            >
-                <Wand2 className="w-4 h-4" /> 一键生成
-            </button>
+            <button onClick={() => handleNodeAction('script')} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg"><Wand2 className="w-4 h-4" /> 一键生成</button>
         </div>
 
-        {/* Canvas Area */}
-        <div 
-            ref={canvasRef}
-            className={`flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing`}
-            onMouseDown={(e) => { setIsDragging(true); dragStartRef.current = { x: e.clientX, y: e.clientY }; }}
-            onMouseMove={(e) => {
-                if (isDragging) {
-                    const dx = e.clientX - dragStartRef.current.x;
-                    const dy = e.clientY - dragStartRef.current.y;
-                    setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
-                    dragStartRef.current = { x: e.clientX, y: e.clientY };
-                }
-            }}
-            onMouseUp={() => setIsDragging(false)}
-            onClick={(e) => {
-                // Close sidebar if clicking blank canvas (and not dragging)
-                if (!isDragging) {
-                     setSelectedNodeId(null);
-                }
-            }}
-            onWheel={(e) => {
-                 if (e.ctrlKey) {
-                    e.preventDefault();
-                    setTransform(prev => ({ ...prev, scale: Math.min(Math.max(0.5, prev.scale - e.deltaY * 0.001), 2) }));
-                 } else {
-                    setTransform(prev => ({ ...prev, x: prev.x - e.deltaX, y: prev.y - e.deltaY }));
-                 }
-            }}
-        >
-             {/* Dot Grid Background */}
-            <div 
-                className="absolute inset-0 opacity-10 pointer-events-none"
-                style={{
-                    backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)',
-                    backgroundSize: `${24 * transform.scale}px ${24 * transform.scale}px`,
-                    backgroundPosition: `${transform.x}px ${transform.y}px`
-                }}
-            />
-
-            <div style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`, transformOrigin: '0 0' }}>
-                {/* Connections */}
+        <div className="flex-1 relative cursor-grab active:cursor-grabbing" onMouseDown={(e) => { (e.target as HTMLElement).style.cursor = 'grabbing'; }} onMouseUp={(e) => { (e.target as HTMLElement).style.cursor = 'grab'; }}>
+             <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+             <div style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`, transformOrigin: '0 0' }}>
                 <svg className="overflow-visible absolute top-0 left-0 pointer-events-none">
-                    {CONNECTIONS.map((conn, idx) => {
-                        const fromNode = NODES_CONFIG.find(n => n.id === conn.from);
-                        const toNode = NODES_CONFIG.find(n => n.id === conn.to);
-                        if (!fromNode || !toNode) return null;
-                        return (
-                            <path 
-                                key={idx}
-                                d={getCurvePath(fromNode, toNode)}
-                                stroke="#cbd5e1"
-                                strokeWidth="2"
-                                fill="none"
-                            />
-                        );
+                    {CONNECTIONS.map((c, i) => {
+                        const f = NODES_CONFIG.find(n => n.id === c.from)!; const t = NODES_CONFIG.find(n => n.id === c.to)!;
+                        return <path key={i} d={`M ${f.x+NODE_WIDTH} ${f.y+NODE_HEIGHT/2} C ${f.x+NODE_WIDTH+100} ${f.y+NODE_HEIGHT/2} ${t.x-100} ${t.y+NODE_HEIGHT/2} ${t.x} ${t.y+NODE_HEIGHT/2}`} stroke="#cbd5e1" strokeWidth="2" fill="none" />;
                     })}
                 </svg>
-
-                {/* Nodes */}
-                {NODES_CONFIG.map((node, index) => {
-                     const isActive = selectedNodeId === node.id;
-                     const isGenerating = generatingNodes.has(node.id);
-                     let hasData = false;
-                     
-                     if (node.id === 'input') hasData = !!project.title;
-                     if (node.id === 'script') hasData = !!project.script;
-                     if (node.id === 'titles') hasData = !!project.titles && project.titles.length > 0;
-                     if (node.id === 'audio_file') hasData = !!project.audioFile || !!pendingAudio;
-                     if (node.id === 'summary') hasData = !!project.summary && project.summary.trim().length > 0;
-                     if (node.id === 'cover') hasData = !!project.coverOptions && project.coverOptions.length > 0;
-
-                     // Determine button label/icon based on node type
-                     let actionLabel = '生成';
-                     let ActionIcon = Sparkles;
-                     if (node.id === 'audio_file') {
-                         actionLabel = '上传';
-                         ActionIcon = Upload;
-                     } else if (hasData) {
-                         actionLabel = '重新生成';
-                         ActionIcon = RefreshCw;
-                     }
-
-                     const timeStr = formatTime(project.moduleTimestamps?.[node.id]);
-
-                     return (
-                         <div 
-                            key={node.id}
-                            style={{ left: node.x, top: node.y, width: NODE_WIDTH, height: NODE_HEIGHT }}
-                            className={`absolute rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden group hover:shadow-md ${
-                                isActive 
-                                ? `ring-2 ring-offset-2 ring-${node.color}-400 border-${node.color}-200` 
-                                : hasData
-                                    ? 'bg-emerald-50/80 border-emerald-200'
-                                    : 'bg-white border-slate-200 hover:border-slate-300'
-                            }`}
-                            onClick={(e) => { e.stopPropagation(); setSelectedNodeId(node.id); }}
-                         >
-                             {/* Header */}
-                             <div className={`h-12 w-full border-b flex items-center px-4 justify-between bg-gradient-to-r ${hasData ? 'from-emerald-50 to-white border-emerald-100' : 'from-white to-slate-50 border-slate-100'}`}>
-                                 <div className="flex items-center gap-2 font-bold text-slate-700">
-                                     <span className={`flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-extrabold border mr-1 ${
-                                        hasData 
-                                        ? 'bg-emerald-100 text-emerald-600 border-emerald-200' 
-                                        : `bg-${node.color}-50 text-${node.color}-600 border-${node.color}-100`
-                                    }`}>
-                                        {index + 1}
-                                    </span>
-                                     <node.icon className={`w-5 h-5 ${hasData ? 'text-emerald-500' : `text-${node.color}-500`}`} />
-                                     {node.label}
-                                 </div>
-                                 <div className="flex items-center gap-2">
-                                     {timeStr && (
-                                        <span className="flex items-center gap-1 text-[9px] font-medium text-slate-400 bg-white/60 px-1.5 py-0.5 rounded-full border border-slate-100/50 backdrop-blur-sm" title="最后更新时间">
-                                            <Clock className="w-2.5 h-2.5" />
-                                            {timeStr}
-                                        </span>
-                                     )}
-                                     {isActive && <div className={`w-2 h-2 rounded-full bg-${node.color}-500 animate-pulse`}></div>}
-                                 </div>
+                {NODES_CONFIG.map((n, i) => {
+                    const has = n.id==='input' ? !!project.title : n.id==='script' ? !!project.script : n.id==='titles' ? !!project.titles?.length : n.id==='audio_file' ? !!project.audioFile||!!pendingAudio : n.id==='summary' ? !!project.summary : !!project.coverOptions?.length;
+                    return (
+                        <div key={n.id} style={{ left: n.x, top: n.y, width: NODE_WIDTH, height: NODE_HEIGHT }} onClick={() => setSelectedNodeId(n.id)} className={`absolute rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden bg-white hover:shadow-md ${selectedNodeId===n.id ? 'ring-2 ring-indigo-400' : has ? 'bg-emerald-50/50 border-emerald-100' : ''}`}>
+                             <div className={`h-11 border-b flex items-center px-4 justify-between ${has ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
+                                 <div className="flex items-center gap-2 font-bold text-slate-700 text-sm"><n.icon className={`w-4 h-4 ${has ? 'text-emerald-500' : 'text-slate-400'}`} /> {n.label}</div>
+                                 {has && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
                              </div>
-
-                             <div className="p-5 flex flex-col justify-between flex-1 relative">
-                                <p className="text-xs text-slate-500 font-medium leading-relaxed mb-4">{node.description}</p>
-                                
-                                <div className="flex items-center justify-between mt-auto">
-                                    <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
-                                        hasData 
-                                        ? 'bg-emerald-100 text-emerald-600 border-emerald-200' 
-                                        : 'bg-slate-50 text-slate-400 border-slate-100'
-                                    }`}>
-                                        {isGenerating ? '处理中...' : hasData ? '已完成' : '待处理'}
-                                    </span>
-                                    
-                                    {/* Fixed Generate/Action Button */}
-                                    {node.id !== 'input' && (
-                                        <button 
-                                            onClick={(e) => { 
-                                                e.stopPropagation(); 
-                                                handleNodeAction(node.id);
-                                            }}
-                                            disabled={isGenerating}
-                                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
-                                                isGenerating 
-                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                                : hasData 
-                                                    ? 'bg-white text-slate-600 border border-slate-200 hover:text-blue-600 hover:border-blue-200' 
-                                                    : `bg-${node.color}-500 hover:bg-${node.color}-600 text-white`
-                                            }`}
-                                        >
-                                            {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <ActionIcon className="w-3 h-3" />}
-                                            {isGenerating ? '处理中' : actionLabel}
-                                        </button>
-                                    )}
-                                </div>
+                             <div className="p-4 flex flex-col justify-between flex-1">
+                                <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">{n.description}</p>
+                                {n.id !== 'input' && (
+                                    <button onClick={(e) => { e.stopPropagation(); handleNodeAction(n.id); }} className={`mt-auto py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${generatingNodes.has(n.id) ? 'bg-slate-100 text-slate-400' : has ? 'bg-white border text-slate-600' : 'bg-slate-900 text-white'}`}>
+                                        {generatingNodes.has(n.id) ? <Loader2 className="w-3 h-3 animate-spin" /> : has ? <RefreshCw className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />} {generatingNodes.has(n.id) ? '生成中' : has ? '重选' : '生成'}
+                                    </button>
+                                )}
                              </div>
-                         </div>
-                     );
-                 })}
-            </div>
+                        </div>
+                    );
+                })}
+             </div>
         </div>
 
-        {/* Right Sidebar - Clean Panel */}
-        <div className={`absolute top-0 right-0 bottom-0 w-[500px] bg-white border-l border-slate-200 shadow-xl transition-transform duration-300 z-30 flex flex-col ${selectedNodeId ? 'translate-x-0' : 'translate-x-full'}`}>
-            {/* Sidebar Header */}
-            <div className="h-14 flex items-center justify-between px-6 border-b border-slate-100 bg-white">
-                <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                    {selectedNodeId && (() => {
-                        const n = NODES_CONFIG.find(x => x.id === selectedNodeId);
-                        return <><n.icon className={`w-5 h-5 text-${n?.color}-500`} /> {n?.panelTitle}</>
-                    })()}
-                </h3>
-                <button onClick={() => setSelectedNodeId(null)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600">
-                    <PanelRightClose className="w-5 h-5" />
-                </button>
+        <div className={`absolute top-0 right-0 bottom-0 w-[500px] bg-white border-l shadow-2xl transition-transform duration-300 z-30 flex flex-col ${selectedNodeId ? 'translate-x-0' : 'translate-x-full'}`}>
+            <div className="h-14 flex items-center justify-between px-6 border-b bg-white">
+                <h3 className="font-bold text-slate-800">{selectedNodeId && NODES_CONFIG.find(x => x.id === selectedNodeId)?.panelTitle}</h3>
+                <button onClick={() => setSelectedNodeId(null)} className="p-2 text-slate-400 hover:text-slate-600"><PanelRightClose className="w-5 h-5" /></button>
             </div>
-
-            {/* Sidebar Content */}
-            <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
-                 {selectedNodeId === 'input' && (
-                     <TextResultBox 
-                        title="视频主题 (Project Input)" 
-                        content={project.inputs.topic || project.title} 
-                        readOnly={true}
-                        showStats={true}
-                    />
-                 )}
-
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+                 {selectedNodeId === 'input' && <TextResultBox title="视频主题" content={project.inputs.topic} readOnly={true} />}
+                 {selectedNodeId === 'script' && <TextResultBox title="视频脚本" content={project.script} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, script: v })} autoCleanAsterisks={true} />}
                  {selectedNodeId === 'audio_file' && (
-                    <div className="flex flex-col h-full gap-4">
-                        {/* Split View: Script Top */}
-                        <div className="flex-1 bg-white rounded-2xl border border-slate-200 p-4 overflow-y-auto shadow-sm">
-                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 sticky top-0 bg-white py-1">参考脚本</h4>
-                            <p className="text-lg font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">
-                                {project.script || "暂无脚本内容。"}
-                            </p>
-                        </div>
-
-                        {/* Player Bottom */}
-                        <div className="shrink-0">
-                            {(project.audioFile || pendingAudio) ? (
-                                <FancyAudioPlayer 
-                                    src={pendingAudio ? pendingAudio.url : project.audioFile!}
-                                    fileName={pendingAudio ? pendingAudio.file.name : `${(project.title || 'audio').replace(/[\\/:*?"<>|]/g, "_")}.mp3`}
-                                    isLocal={!!pendingAudio}
-                                    isUploading={isUploading}
-                                    uploadProgress={audioUploadProgress}
-                                    onReplace={() => audioInputRef.current?.click()}
-                                    onUpload={executeAudioUpload}
-                                    onDelete={async () => { /* delete logic */ }}
-                                />
-                            ) : (
-                                <div 
-                                    onClick={() => audioInputRef.current?.click()}
-                                    className="h-32 rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-400 bg-white hover:bg-blue-50 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group"
-                                >
-                                    <div className="w-12 h-12 rounded-full bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-                                        <FileAudio className="w-6 h-6 text-slate-400 group-hover:text-blue-500" />
-                                    </div>
-                                    <span className="text-sm font-bold text-slate-500 group-hover:text-blue-600">点击选择音频文件</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                     <div className="space-y-4">
+                        {(project.audioFile || pendingAudio) && <FancyAudioPlayer src={pendingAudio ? pendingAudio.url : project.audioFile} fileName={pendingAudio ? pendingAudio.file.name : '音频文件.mp3'} isLocal={!!pendingAudio} isUploading={isUploading} uploadProgress={uploadProgress} onReplace={() => audioInputRef.current?.click()} onUpload={executeAudioUpload} />}
+                        {!project.audioFile && !pendingAudio && <div onClick={() => audioInputRef.current?.click()} className="h-32 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 cursor-pointer hover:bg-white transition-all"><FileAudio className="w-8 h-8" /><span className="text-xs font-bold">点击选择 MP3 文件</span></div>}
+                     </div>
                  )}
-
-                 {selectedNodeId === 'script' && (
-                    <TextResultBox 
-                        title="视频脚本" 
-                        content={project.script || ''} 
-                        placeholder="AI 将在此生成脚本..."
-                        onSave={(val) => updateProjectField('script', val)} 
-                        showStats={true}
-                        autoCleanAsterisks={true}
-                    />
-                 )}
-
                  {selectedNodeId === 'titles' && (
-                    <div className="space-y-4">
-                        {!project.titles || project.titles.length === 0 ? (
-                            <div className="text-center py-10 text-slate-400">
-                                <Type className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                                <p>暂无标题，请点击节点上的“生成”按钮。</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {project.titles.map((item, idx) => (
-                                    <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <span className="bg-slate-100 text-slate-500 text-xs font-bold px-1.5 py-0.5 rounded">{idx + 1}</span>
-                                                {item.score && (
-                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
-                                                        item.score >= 90 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                                        item.score >= 80 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-slate-50 text-slate-500 border-slate-100'
-                                                    }`}>{item.score}分</span>
-                                                )}
-                                            </div>
-                                            <RowCopyButton text={item.title} />
-                                        </div>
-                                        <h4 className="text-slate-800 font-bold mb-2">{item.title}</h4>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                     <div className="space-y-3">
+                         {project.titles?.map((t, i) => (
+                             <div key={i} className="bg-white p-4 rounded-xl border flex justify-between items-center group">
+                                 <div className="font-bold text-slate-700 text-sm">{t.title}</div>
+                                 <RowCopyButton text={t.title} />
+                             </div>
+                         ))}
+                     </div>
                  )}
-
-                 {selectedNodeId === 'summary' && (
-                    <TextResultBox 
-                        title="简介与标签" 
-                        content={project.summary || ''} 
-                        placeholder="AI 将在此生成视频简介和标签..."
-                        onSave={(val) => updateProjectField('summary', val)} 
-                        showStats={true}
-                        autoCleanAsterisks={true}
-                    />
-                 )}
-
+                 {selectedNodeId === 'summary' && <TextResultBox title="简介标签" content={project.summary} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, summary: v })} />}
                  {selectedNodeId === 'cover' && (
                      <div className="space-y-4">
-                        {!project.coverOptions || project.coverOptions.length === 0 ? (
-                            <div className="text-center py-10 text-slate-400">
-                                <Palette className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                                <p>暂无封面方案，请点击节点上的“生成”按钮。</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-6">
-                                {project.coverOptions.map((item, idx) => {
-                                    // Logic to automatically split Top Title if separators exist
-                                    let displayTop = item.titleTop || '';
-                                    let displayBottom = item.titleBottom || '';
-
-                                    // Check for separators ｜, |, /, -, or space to split the main title
-                                    const separators = ['｜', '|', '/', '-', ' '];
-                                    let splitIndex = -1;
-                                    
-                                    for (const sep of separators) {
-                                        if (displayTop.includes(sep)) {
-                                            splitIndex = displayTop.indexOf(sep);
-                                            break;
-                                        }
-                                    }
-
-                                    if (splitIndex !== -1) {
-                                        const p1 = displayTop.substring(0, splitIndex).trim();
-                                        const p2 = displayTop.substring(splitIndex + 1).trim(); // +1 to skip separator
-                                        // If split results in two non-empty parts, use them
-                                        // This overrides existing bottom title if split happens
-                                        if (p1 && p2) {
-                                            displayTop = p1;
-                                            displayBottom = p2;
-                                        }
-                                    }
-
-                                    return (
-                                        <div key={idx} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                                            <div className="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center">
-                                                <span className="text-xs font-bold text-slate-500 uppercase">方案 {idx + 1}</span>
-                                                {item.score && (
-                                                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{item.score} 推荐</span>
-                                                )}
-                                            </div>
-                                            <div className="p-4 space-y-4">
-                                                <div>
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase block">封面文案</span>
-                                                        <RowCopyButton text={`${displayTop}\n${displayBottom}`} />
-                                                    </div>
-                                                    
-                                                    {/* Rendering Main Title (Top) and Sub Title (Bottom) */}
-                                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
-                                                        {/* Main Title - Prominent */}
-                                                        <div className="space-y-1">
-                                                            <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-1 rounded uppercase tracking-wider">主标题 (上行)</span>
-                                                            <div className="text-lg font-black text-slate-900 leading-tight">
-                                                                {displayTop || '—'}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Divider */}
-                                                        <div className="border-t border-slate-200 border-dashed"></div>
-
-                                                        {/* Sub Title - Secondary */}
-                                                        <div className="space-y-1">
-                                                            <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1 rounded uppercase tracking-wider">副标题 (下行)</span>
-                                                            <div className="text-sm font-bold text-slate-600 leading-snug">
-                                                                {displayBottom || '—'}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                         {project.coverOptions?.map((o, i) => (
+                             <div key={i} className="bg-white rounded-xl border overflow-hidden">
+                                 <div className="bg-slate-50 px-4 py-2 border-b text-[10px] font-black uppercase text-slate-400 tracking-widest">方案 {i+1}</div>
+                                 <div className="p-4 space-y-3">
+                                     <div className="text-lg font-black text-slate-800 leading-tight">{o.titleTop}</div>
+                                     <div className="text-sm font-bold text-slate-500">{o.titleBottom}</div>
+                                     <div className="pt-2 text-[10px] text-slate-400 italic">视觉: {o.visual}</div>
+                                 </div>
+                             </div>
+                         ))}
                      </div>
                  )}
             </div>
         </div>
 
-      {/* API Config Modal */}
-      {showConfigModal && (
-          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-                  <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                      <h3 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                          <Settings2 className="w-6 h-6 text-indigo-600" />
-                          API 配置
-                      </h3>
-                      <button onClick={() => setShowConfigModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                          <X className="w-6 h-6" />
-                      </button>
-                  </div>
-                  
-                  <div className="p-8 space-y-6">
-                      {/* API Key Input */}
-                      <div>
-                          <label className="text-sm font-bold text-slate-700 mb-2 flex items-center justify-between">
-                              <span>自定义 API Key (可选)</span>
-                              {customKey && <span className="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded font-mono">{getMaskedKey(customKey)}</span>}
-                          </label>
-                          <div className="relative">
-                              <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                              <input 
-                                  type="password"
-                                  value={customKey}
-                                  onChange={(e) => setCustomKey(e.target.value)}
-                                  placeholder={customKey ? "已设置 (点击修改)" : "使用系统默认 Key (sk-...)"}
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-10 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
-                              />
-                              <button
-                                  onClick={handlePasteApi}
-                                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                  title="从剪贴板粘贴"
-                              >
-                                  <ClipboardPaste className="w-4 h-4" />
-                              </button>
-                          </div>
-                          <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                              {customKey ? (
-                                  <span className="text-indigo-600 font-bold">当前优先使用自定义 Key。</span>
-                              ) : (
-                                  <span className="text-slate-500">当前为空，将自动使用系统后台配置的默认 Key。</span>
-                              )}
-                              <br/>
-                              Key 仅保存在本地浏览器缓存中。
-                          </p>
-                      </div>
-                  </div>
-
-                  <div className="px-8 py-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
-                      <button 
-                          onClick={() => { setCustomKey(''); }}
-                          className="px-4 py-2 text-slate-500 font-bold text-sm hover:text-rose-600 transition-colors"
-                      >
-                          清空
-                      </button>
-                      <button 
-                          onClick={saveApiSettings}
-                          className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition-all text-sm"
-                      >
-                          保存配置
-                      </button>
-                  </div>
-              </div>
-          </div>
-      )}
-
+        {showConfigModal && (
+            <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative">
+                    <button onClick={() => setShowConfigModal(false)} className="absolute top-4 right-4 text-slate-400"><X className="w-5 h-5" /></button>
+                    <h3 className="text-xl font-bold mb-6">API 配置</h3>
+                    <div className="space-y-4">
+                        <div><label className="text-xs font-bold text-slate-500 uppercase block mb-2">Gemini API Key</label>
+                        <input type="password" value={customKey} onChange={(e) => setCustomKey(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-4 py-3 outline-none" placeholder="sk-..." /></div>
+                        <button onClick={() => { localStorage.setItem('lva_custom_api_key', customKey); setShowConfigModal(false); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold">保存设置</button>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };
