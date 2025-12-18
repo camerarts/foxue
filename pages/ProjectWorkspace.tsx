@@ -52,9 +52,9 @@ const FancyAudioPlayer = ({ src, fileName, isLocal, onReplace, onDelete, isUploa
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
 
-    const bars = useMemo(() => Array.from({ length: 12 }).map(() => ({
-        delay: Math.random() * -1,
-        duration: 0.6 + Math.random() * 0.8
+    const bars = useMemo(() => Array.from({ length: 24 }).map(() => ({
+        delay: Math.random() * -1.5,
+        duration: 0.8 + Math.random() * 1.2
     })), []);
 
     useEffect(() => {
@@ -97,37 +97,104 @@ const FancyAudioPlayer = ({ src, fileName, isLocal, onReplace, onDelete, isUploa
     };
 
     return (
-        <div className="w-full bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-             <style>{`@keyframes music-bar-bounce { 0%, 100% { height: 4px; opacity: 0.5; } 50% { height: 100%; opacity: 1; } }`}</style>
+        <div className="w-full relative group overflow-hidden bg-white/40 backdrop-blur-xl border border-white/20 rounded-[32px] shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] p-6 transition-all duration-500 hover:shadow-[0_8px_40px_0_rgba(31,38,135,0.12)]">
+             <style>{`
+                @keyframes music-bar-bounce { 
+                    0%, 100% { height: 6px; opacity: 0.3; } 
+                    50% { height: 100%; opacity: 0.9; } 
+                }
+                .audio-slider::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    appearance: none;
+                    width: 12px;
+                    height: 12px;
+                    background: #6366f1;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    border: 2px solid white;
+                    box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+                }
+             `}</style>
              <audio ref={audioRef} src={src} />
-             <div className="flex items-start justify-between mb-6">
+             
+             {/* Header Info */}
+             <div className="flex items-center justify-between mb-8">
                  <div className="flex items-center gap-4">
-                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${isPlaying ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-400'}`}>
-                         <Music4 className="w-7 h-7" />
+                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 ${isPlaying ? 'bg-indigo-500 text-white rotate-12' : 'bg-slate-100 text-slate-400'}`}>
+                         {isPlaying ? <Music4 className="w-6 h-6 animate-pulse" /> : <Volume2 className="w-6 h-6" />}
                      </div>
-                     <div><h4 className="text-base font-bold text-slate-800 line-clamp-1">{fileName}</h4><span className="text-[10px] text-slate-400">{isLocal ? '待上传' : '已存云端'}</span></div>
+                     <div className="max-w-[180px]">
+                        <h4 className="text-sm font-bold text-slate-800 line-clamp-1 mb-0.5 tracking-tight">{fileName}</h4>
+                        <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${isLocal ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isLocal ? 'Offline Cache' : 'Cloud Synchronized'}</span>
+                        </div>
+                     </div>
                  </div>
-                 <div className="flex items-center gap-0.5 h-8">
-                    {bars.map((bar, i) => (<div key={i} className="w-1 bg-indigo-500 rounded-full" style={{ animation: isPlaying ? `music-bar-bounce ${bar.duration}s infinite` : 'none', animationDelay: `${bar.delay}s` }} />))}
+                 
+                 {/* Visualizer Spectrum */}
+                 <div className="flex items-center gap-[2px] h-8 pt-1">
+                    {bars.map((bar, i) => (
+                        <div 
+                            key={i} 
+                            className="w-[2px] bg-indigo-500/80 rounded-full" 
+                            style={{ 
+                                animation: isPlaying ? `music-bar-bounce ${bar.duration}s infinite` : 'none', 
+                                animationDelay: `${bar.delay}s`,
+                                height: isPlaying ? 'auto' : `${4 + Math.random() * 8}px`
+                            }} 
+                        />
+                    ))}
                  </div>
              </div>
-             <div className="relative w-full h-1.5 bg-slate-100 rounded-full mb-2">
-                <div className="absolute top-0 left-0 h-full bg-indigo-600 rounded-full" style={{ width: `${progress}%` }} />
-                <input type="range" min="0" max="100" value={progress} onChange={handleSeek} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+
+             {/* Progress Controls */}
+             <div className="space-y-3 mb-8">
+                <div className="relative h-1 w-full flex items-center">
+                    <div className="absolute w-full h-[2px] bg-slate-200/50 rounded-full overflow-hidden">
+                        <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+                    </div>
+                    <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        value={progress} 
+                        onChange={handleSeek} 
+                        className="audio-slider absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                    />
+                </div>
+                <div className="flex justify-between text-[10px] font-bold font-mono text-slate-400 tracking-tighter">
+                    <span>{formatTime(currentTime)}</span>
+                    <span>{formatTime(duration)}</span>
+                </div>
              </div>
-             <div className="flex justify-between text-[10px] font-mono text-slate-400"><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div>
-             <div className="flex items-center justify-between mt-4">
-                 <button onClick={togglePlay} className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center hover:scale-105 transition-all">{isPlaying ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white ml-1" />}</button>
-                 <div className="flex gap-1 bg-slate-50 p-1 rounded-lg">
-                    <button onClick={onReplace} className="p-2 text-slate-500 hover:text-indigo-600"><RefreshCw className="w-4 h-4" /></button>
-                    {onDelete && <button onClick={onDelete} className="p-2 text-slate-500 hover:text-rose-500"><Trash2 className="w-4 h-4" /></button>}
+
+             {/* Action Bar */}
+             <div className="flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                    <button 
+                        onClick={togglePlay} 
+                        className="w-14 h-14 rounded-full bg-slate-900 text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-slate-900/10"
+                    >
+                        {isPlaying ? <Pause className="w-6 h-6 fill-white" /> : <Play className="w-6 h-6 fill-white ml-1" />}
+                    </button>
+                    <div className="flex gap-1.5 px-2">
+                        <button onClick={onReplace} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white/50 rounded-xl transition-all" title="替换文件"><RefreshCw className="w-4 h-4" /></button>
+                        {onDelete && <button onClick={onDelete} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all" title="删除"><Trash2 className="w-4 h-4" /></button>}
+                    </div>
                  </div>
+
+                 {isLocal && (
+                     <button 
+                        onClick={onUpload} 
+                        disabled={isUploading}
+                        className="h-14 px-6 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl flex items-center gap-3 hover:bg-indigo-700 active:bg-indigo-800 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+                    >
+                        {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />} 
+                        {isUploading ? `${Math.round(uploadProgress)}%` : 'Sync Cloud'}
+                     </button>
+                 )}
              </div>
-             {isLocal && (
-                 <button onClick={onUpload} className="w-full mt-6 py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2">
-                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />} {isUploading ? `${Math.round(uploadProgress)}%` : '上传云端'}
-                 </button>
-             )}
         </div>
     );
 };
@@ -365,10 +432,18 @@ const ProjectWorkspace: React.FC = () => {
                             />
                         </div>
                         {/* Bottom 1/3: Audio Player / Upload Area */}
-                        <div className="flex-[1] overflow-y-auto min-h-[180px]">
+                        <div className="flex-[1] overflow-y-auto min-h-[220px]">
                             <div className="space-y-4">
                                 {(project.audioFile || pendingAudio) && <FancyAudioPlayer src={pendingAudio ? pendingAudio.url : project.audioFile} fileName={pendingAudio ? pendingAudio.file.name : '音频文件.mp3'} isLocal={!!pendingAudio} isUploading={isUploading} uploadProgress={uploadProgress} onReplace={() => audioInputRef.current?.click()} onUpload={executeAudioUpload} />}
-                                {!project.audioFile && !pendingAudio && <div onClick={() => audioInputRef.current?.click()} className="h-32 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 cursor-pointer hover:bg-white transition-all"><FileAudio className="w-8 h-8" /><span className="text-xs font-bold">点击选择 MP3 文件</span></div>}
+                                {!project.audioFile && !pendingAudio && <div onClick={() => audioInputRef.current?.click()} className="h-40 border-2 border-dashed border-slate-200 bg-white/50 backdrop-blur rounded-[32px] flex flex-col items-center justify-center gap-4 text-slate-400 cursor-pointer hover:bg-white hover:border-indigo-300 hover:text-indigo-600 transition-all group">
+                                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center group-hover:bg-indigo-50 transition-all">
+                                        <Upload className="w-8 h-8" />
+                                    </div>
+                                    <div className="text-center">
+                                        <span className="text-sm font-bold block">点击上传音频</span>
+                                        <span className="text-[10px] uppercase tracking-widest opacity-60">MP3, WAV, M4A supported</span>
+                                    </div>
+                                </div>}
                             </div>
                         </div>
                      </div>
