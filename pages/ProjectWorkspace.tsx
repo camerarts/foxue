@@ -419,7 +419,13 @@ const ProjectWorkspace: React.FC = () => {
                         <div key={n.id} style={{ left: n.x, top: n.y, width: NODE_WIDTH, height: NODE_HEIGHT }} onClick={(e) => { e.stopPropagation(); setSelectedNodeId(n.id); }} className={`absolute rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden bg-white hover:shadow-md ${selectedNodeId===n.id ? 'ring-2 ring-indigo-400' : has ? 'bg-emerald-50/50 border-emerald-100' : ''}`}>
                              <div className={`h-11 border-b flex items-center px-4 justify-between ${has ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
                                  <div className="flex flex-col">
-                                     <div className="flex items-center gap-2 font-bold text-slate-700 text-sm"><n.icon className={`w-4 h-4 ${has ? 'text-emerald-500' : 'text-slate-400'}`} /> {n.label}</div>
+                                     <div className="flex items-center gap-2.5 font-bold text-slate-700 text-sm">
+                                         <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white shadow-sm transition-colors ${has ? 'bg-emerald-500' : 'bg-slate-900'}`}>
+                                             {i + 1}
+                                         </span>
+                                         <n.icon className={`w-4 h-4 ${has ? 'text-emerald-500' : 'text-slate-400'}`} /> 
+                                         {n.label}
+                                     </div>
                                  </div>
                                  <div className="flex items-center gap-2">
                                      {ts && <CompactTimestamp ts={ts} />}
