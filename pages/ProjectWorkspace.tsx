@@ -351,15 +351,7 @@ const ProjectWorkspace: React.FC = () => {
                 <button onClick={() => setSelectedNodeId(null)} className="p-2 text-slate-400 hover:text-slate-600"><PanelRightClose className="w-5 h-5" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
-                 {/* Generation Time Information */}
-                 {selectedNodeId && project.moduleTimestamps?.[selectedNodeId] && (
-                     <div className="mb-4 text-[10px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-widest bg-white/50 py-1 px-3 rounded-full border border-slate-200 w-fit mx-auto">
-                         <Clock className="w-3 h-3" /> {formatTimestamp(project.moduleTimestamps[selectedNodeId])}
-                     </div>
-                 )}
-
                  {selectedNodeId === 'input' && <TextResultBox title="视频主题" content={project.inputs.topic} readOnly={true} />}
-                 {/* Enabled showStats for script editor */}
                  {selectedNodeId === 'script' && <TextResultBox title="视频脚本" content={project.script} showStats={true} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, script: v })} autoCleanAsterisks={true} />}
                  {selectedNodeId === 'audio_file' && (
                      <div className="space-y-4">
