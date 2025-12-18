@@ -101,7 +101,7 @@ const FancyAudioPlayer = ({ src, fileName, isLocal, onReplace, onDelete, isUploa
                  <button onClick={togglePlay} className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center hover:scale-105 transition-all">{isPlaying ? <Pause className="w-5 h-5 fill-white" /> : <Play className="w-5 h-5 fill-white ml-1" />}</button>
                  <div className="flex gap-1 bg-slate-50 p-1 rounded-lg">
                     <button onClick={onReplace} className="p-2 text-slate-500 hover:text-indigo-600"><RefreshCw className="w-4 h-4" /></button>
-                    {onDelete && <button onClick={onDelete} className="p-2 text-slate-500 hover:text-rose-500"><Trash2 className="w-4 h-4" /></button>}
+                    {onDelete && <button onDelete={onDelete} className="p-2 text-slate-500 hover:text-rose-500"><Trash2 className="w-4 h-4" /></button>}
                  </div>
              </div>
              {isLocal && (
@@ -161,6 +161,8 @@ const ProjectWorkspace: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [pendingAudio, setPendingAudio] = useState<any>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
   const [syncStatus, setSyncStatus] = useState<any>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [customKey, setCustomKey] = useState('');
@@ -221,6 +223,24 @@ const ProjectWorkspace: React.FC = () => {
     } catch (e: any) { alert(`生成失败: ${e.message}`); } finally { setGeneratingNodes(prev => { const n = new Set(prev); n.delete(nodeId); return n; }); }
   };
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only left click
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
   const executeAudioUpload = async () => {
       if (!pendingAudio || !project) return;
       setIsUploading(true);
@@ -249,8 +269,21 @@ const ProjectWorkspace: React.FC = () => {
             <button onClick={() => handleNodeAction('script')} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg"><Wand2 className="w-4 h-4" /> 一键生成</button>
         </div>
 
-        <div className="flex-1 relative cursor-grab active:cursor-grabbing" onMouseDown={(e) => { (e.target as HTMLElement).style.cursor = 'grabbing'; }} onMouseUp={(e) => { (e.target as HTMLElement).style.cursor = 'grab'; }}>
-             <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+        <div 
+          className={`flex-1 relative transition-colors ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+             <div 
+               className="absolute inset-0 opacity-10 pointer-events-none" 
+               style={{ 
+                 backgroundImage: 'radial-gradient(circle, #000 1px, transparent 1px)', 
+                 backgroundSize: '24px 24px',
+                 backgroundPosition: `${transform.x}px ${transform.y}px`
+               }} 
+             />
              <div style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`, transformOrigin: '0 0' }}>
                 <svg className="overflow-visible absolute top-0 left-0 pointer-events-none">
                     {CONNECTIONS.map((c, i) => {
@@ -261,7 +294,7 @@ const ProjectWorkspace: React.FC = () => {
                 {NODES_CONFIG.map((n, i) => {
                     const has = n.id==='input' ? !!project.title : n.id==='script' ? !!project.script : n.id==='titles' ? !!project.titles?.length : n.id==='audio_file' ? !!project.audioFile||!!pendingAudio : n.id==='summary' ? !!project.summary : !!project.coverOptions?.length;
                     return (
-                        <div key={n.id} style={{ left: n.x, top: n.y, width: NODE_WIDTH, height: NODE_HEIGHT }} onClick={() => setSelectedNodeId(n.id)} className={`absolute rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden bg-white hover:shadow-md ${selectedNodeId===n.id ? 'ring-2 ring-indigo-400' : has ? 'bg-emerald-50/50 border-emerald-100' : ''}`}>
+                        <div key={n.id} style={{ left: n.x, top: n.y, width: NODE_WIDTH, height: NODE_HEIGHT }} onClick={(e) => { e.stopPropagation(); setSelectedNodeId(n.id); }} className={`absolute rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden bg-white hover:shadow-md ${selectedNodeId===n.id ? 'ring-2 ring-indigo-400' : has ? 'bg-emerald-50/50 border-emerald-100' : ''}`}>
                              <div className={`h-11 border-b flex items-center px-4 justify-between ${has ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
                                  <div className="flex items-center gap-2 font-bold text-slate-700 text-sm"><n.icon className={`w-4 h-4 ${has ? 'text-emerald-500' : 'text-slate-400'}`} /> {n.label}</div>
                                  {has && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
