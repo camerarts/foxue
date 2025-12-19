@@ -335,7 +335,7 @@ const ProjectWorkspace: React.FC = () => {
 
   /**
    * 一键生成逻辑：仅针对 3（爆款标题）、5（简介标签）、6（封面策划）
-   * 不包含 2（视频脚本），且依赖于已有脚本。
+   * 规则：如果某个模块已经有内容，则跳过该模块。
    */
   const handleOneClickBatchGenerate = async () => {
     if (!project) return;
@@ -344,12 +344,24 @@ const ProjectWorkspace: React.FC = () => {
         return;
     }
 
-    // 目标模块：3(titles), 5(summary), 6(cover)
-    const targets = ['titles', 'summary', 'cover'];
+    // 检查哪些模块需要生成
+    const needsTitles = !project.titles || project.titles.length === 0;
+    const needsSummary = !project.summary || project.summary.trim() === '';
+    const needsCover = !project.coverOptions || project.coverOptions.length === 0;
+
+    const actualTargets: string[] = [];
+    if (needsTitles) actualTargets.push('titles');
+    if (needsSummary) actualTargets.push('summary');
+    if (needsCover) actualTargets.push('cover');
+
+    if (actualTargets.length === 0) {
+        alert("目标模块（标题、简介、封面）均已有内容，已跳过生成。如需重新生成，请进入单个模块点击“重选”。");
+        return;
+    }
     
     setGeneratingNodes(prev => {
         const next = new Set(prev);
-        targets.forEach(t => next.add(t));
+        actualTargets.forEach(t => next.add(t));
         return next;
     });
 
@@ -357,27 +369,27 @@ const ProjectWorkspace: React.FC = () => {
         const titlePrompt = prompts['TITLES'].template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || '');
         const summaryPrompt = prompts['SUMMARY'].template.replace(/\{\{script\}\}/g, project.script || '');
         const coverPrompt = prompts['COVER_GEN'].template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || '');
-
         const coverSchema = { type: "ARRAY", items: { type: "OBJECT", properties: { visual: { type: "STRING" }, titleTop: { type: "STRING" }, titleBottom: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["visual", "titleTop", "titleBottom"] } };
 
-        // 并行调用 AI
-        const [titlesResult, summaryResult, coverResult] = await Promise.all([
-            gemini.generateJSON<TitleItem[]>(titlePrompt, undefined, customKey),
-            gemini.generateText(summaryPrompt, customKey).then(res => res.trim().replace(/\*/g, '')),
-            gemini.generateJSON<CoverOption[]>(coverPrompt, coverSchema, customKey)
-        ]);
+        // 并行调用 AI，但只调用缺失部分的任务
+        const tasks: Promise<any>[] = [];
+        if (needsTitles) tasks.push(gemini.generateJSON<TitleItem[]>(titlePrompt, undefined, customKey)); else tasks.push(Promise.resolve(null));
+        if (needsSummary) tasks.push(gemini.generateText(summaryPrompt, customKey).then(res => res.trim().replace(/\*/g, ''))); else tasks.push(Promise.resolve(null));
+        if (needsCover) tasks.push(gemini.generateJSON<CoverOption[]>(coverPrompt, coverSchema, customKey)); else tasks.push(Promise.resolve(null));
+
+        const [titlesResult, summaryResult, coverResult] = await Promise.all(tasks);
 
         const now = Date.now();
         const nextProject: ProjectData = {
             ...project,
-            titles: titlesResult,
-            summary: summaryResult,
-            coverOptions: coverResult,
+            titles: needsTitles ? titlesResult : project.titles,
+            summary: needsSummary ? summaryResult : project.summary,
+            coverOptions: needsCover ? coverResult : project.coverOptions,
             moduleTimestamps: {
                 ...(project.moduleTimestamps || {}),
-                titles: now,
-                summary: now,
-                cover: now
+                ...(needsTitles ? { titles: now } : {}),
+                ...(needsSummary ? { summary: now } : {}),
+                ...(needsCover ? { cover: now } : {})
             }
         };
 
@@ -388,7 +400,7 @@ const ProjectWorkspace: React.FC = () => {
     } finally {
         setGeneratingNodes(prev => {
             const n = new Set(prev);
-            targets.forEach(t => n.delete(t));
+            actualTargets.forEach(t => n.delete(t));
             return n;
         });
     }
@@ -447,9 +459,9 @@ const ProjectWorkspace: React.FC = () => {
                 onClick={handleOneClickBatchGenerate} 
                 disabled={generatingNodes.has('titles') || generatingNodes.has('summary') || generatingNodes.has('cover') || !project.script}
                 className={`px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all ${!project.script ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
-                title={!project.script ? "需先生成脚本" : "一键生成标题、简介和封面"}
+                title={!project.script ? "需先生成脚本" : "一键生成标题、简介和封面（仅生成缺失部分）"}
             >
-                {generatingNodes.has('titles') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} 
+                {generatingNodes.size > 0 ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} 
                 一键生成 (3/5/6)
             </button>
         </div>
@@ -608,3 +620,4 @@ const ProjectWorkspace: React.FC = () => {
 };
 
 export default ProjectWorkspace;
+
