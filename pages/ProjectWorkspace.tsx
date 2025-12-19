@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
@@ -99,7 +100,6 @@ const FancyAudioPlayer = ({ src, fileName, downloadName, isLocal, onReplace, onD
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            // Clean filename and add mp3 extension
             const safeName = (downloadName || fileName || 'audio').replace(/[\\/:*?"<>|]/g, "_");
             a.download = `${safeName}.mp3`;
             document.body.appendChild(a);
@@ -142,7 +142,6 @@ const FancyAudioPlayer = ({ src, fileName, downloadName, isLocal, onReplace, onD
              `}</style>
              <audio ref={audioRef} src={src} />
              
-             {/* Header Info */}
              <div className="flex items-center justify-between mb-8">
                  <div className="flex items-center gap-4">
                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 ${isPlaying ? 'bg-indigo-500 text-white rotate-12' : 'bg-slate-100 text-slate-400'}`}>
@@ -157,7 +156,6 @@ const FancyAudioPlayer = ({ src, fileName, downloadName, isLocal, onReplace, onD
                      </div>
                  </div>
                  
-                 {/* Visualizer Spectrum */}
                  <div className="flex items-center gap-[2px] h-8 pt-1">
                     {bars.map((bar, i) => (
                         <div 
@@ -173,7 +171,6 @@ const FancyAudioPlayer = ({ src, fileName, downloadName, isLocal, onReplace, onD
                  </div>
              </div>
 
-             {/* Progress Controls */}
              <div className="space-y-3 mb-8">
                 <div className="relative h-1 w-full flex items-center">
                     <div className="absolute w-full h-[2px] bg-slate-200/50 rounded-full overflow-hidden">
@@ -194,7 +191,6 @@ const FancyAudioPlayer = ({ src, fileName, downloadName, isLocal, onReplace, onD
                 </div>
              </div>
 
-             {/* Action Bar */}
              <div className="flex items-center justify-between">
                  <div className="flex items-center gap-3">
                     <button 
@@ -337,8 +333,69 @@ const ProjectWorkspace: React.FC = () => {
     } catch (e: any) { alert(`生成失败: ${e.message}`); } finally { setGeneratingNodes(prev => { const n = new Set(prev); n.delete(nodeId); return n; }); }
   };
 
+  /**
+   * 一键生成逻辑：仅针对 3（爆款标题）、5（简介标签）、6（封面策划）
+   * 不包含 2（视频脚本），且依赖于已有脚本。
+   */
+  const handleOneClickBatchGenerate = async () => {
+    if (!project) return;
+    if (!project.script) {
+        alert("请先生成或录入视频脚本后再执行一键生成。");
+        return;
+    }
+
+    // 目标模块：3(titles), 5(summary), 6(cover)
+    const targets = ['titles', 'summary', 'cover'];
+    
+    setGeneratingNodes(prev => {
+        const next = new Set(prev);
+        targets.forEach(t => next.add(t));
+        return next;
+    });
+
+    try {
+        const titlePrompt = prompts['TITLES'].template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || '');
+        const summaryPrompt = prompts['SUMMARY'].template.replace(/\{\{script\}\}/g, project.script || '');
+        const coverPrompt = prompts['COVER_GEN'].template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || '');
+
+        const coverSchema = { type: "ARRAY", items: { type: "OBJECT", properties: { visual: { type: "STRING" }, titleTop: { type: "STRING" }, titleBottom: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["visual", "titleTop", "titleBottom"] } };
+
+        // 并行调用 AI
+        const [titlesResult, summaryResult, coverResult] = await Promise.all([
+            gemini.generateJSON<TitleItem[]>(titlePrompt, undefined, customKey),
+            gemini.generateText(summaryPrompt, customKey).then(res => res.trim().replace(/\*/g, '')),
+            gemini.generateJSON<CoverOption[]>(coverPrompt, coverSchema, customKey)
+        ]);
+
+        const now = Date.now();
+        const nextProject: ProjectData = {
+            ...project,
+            titles: titlesResult,
+            summary: summaryResult,
+            coverOptions: coverResult,
+            moduleTimestamps: {
+                ...(project.moduleTimestamps || {}),
+                titles: now,
+                summary: now,
+                cover: now
+            }
+        };
+
+        await updateProjectAndSyncImmediately(nextProject);
+
+    } catch (e: any) {
+        alert(`一键生成部分失败: ${e.message}`);
+    } finally {
+        setGeneratingNodes(prev => {
+            const n = new Set(prev);
+            targets.forEach(t => n.delete(t));
+            return n;
+        });
+    }
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return; // Only left click
+    if (e.button !== 0) return; 
     setIsDragging(true);
     dragStartRef.current = { x: e.clientX, y: e.clientY };
   };
@@ -386,7 +443,15 @@ const ProjectWorkspace: React.FC = () => {
                 {syncStatus === 'saving' ? <Loader2 className="w-3 h-3 animate-spin" /> : syncStatus === 'synced' ? <CloudCheck className="w-3 h-3" /> : <Cloud className="w-3 h-3" />}
                 {syncStatus === 'saving' ? '保存同步中...' : syncStatus === 'synced' ? '已同步云端' : '就绪'}
             </div>
-            <button onClick={() => handleNodeAction('script')} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg"><Wand2 className="w-4 h-4" /> 一键生成</button>
+            <button 
+                onClick={handleOneClickBatchGenerate} 
+                disabled={generatingNodes.has('titles') || generatingNodes.has('summary') || generatingNodes.has('cover') || !project.script}
+                className={`px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg transition-all ${!project.script ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+                title={!project.script ? "需先生成脚本" : "一键生成标题、简介和封面"}
+            >
+                {generatingNodes.has('titles') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} 
+                一键生成 (3/5/6)
+            </button>
         </div>
 
         <div 
@@ -456,7 +521,6 @@ const ProjectWorkspace: React.FC = () => {
                  {selectedNodeId === 'script' && <div className="p-6 h-full overflow-y-auto"><TextResultBox title="视频脚本" content={project.script} showStats={true} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, script: v })} autoCleanAsterisks={true} /></div>}
                  {selectedNodeId === 'audio_file' && (
                      <div className="flex flex-col h-full gap-4 p-6">
-                        {/* Top 2/3: Video Script for reference */}
                         <div className="flex-[2] overflow-hidden">
                             <TextResultBox 
                                 title="参考脚本内容" 
@@ -465,7 +529,6 @@ const ProjectWorkspace: React.FC = () => {
                                 autoCleanAsterisks={true} 
                             />
                         </div>
-                        {/* Bottom 1/3: Audio Player / Upload Area */}
                         <div className="flex-[1] overflow-y-auto min-h-[220px]">
                             <div className="space-y-4">
                                 {(project.audioFile || pendingAudio) && (
