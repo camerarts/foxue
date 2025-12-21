@@ -1,3 +1,4 @@
+
 export enum ProjectStatus {
   DRAFT = 'DRAFT',
   IN_PROGRESS = 'IN_PROGRESS',
@@ -18,9 +19,9 @@ export interface StoryboardFrame {
 }
 
 export interface TitleItem {
-  title: string;
-  keywords?: string;
-  score?: number;
+  mainTitle: string;
+  subTitle: string;
+  score: number;
 }
 
 export interface CoverOption {
@@ -108,17 +109,19 @@ export const DEFAULT_PROMPTS: Record<string, PromptTemplate> = {
     id: 'titles',
     name: '标题生成',
     description: '基于脚本生成具有病毒传播潜力的标题',
-    template: `请基于以下视频脚本，生成10个具有病毒传播潜力的标题。
+    template: `请基于以下视频脚本，生成 5 组具有病毒传播潜力的爆款标题方案。
 
 主题: {{title}}
 脚本内容：{{script}}
 
 **输出格式要求：**
 必须仅返回一个 JSON 数组，严禁返回 Markdown 表格或任何解释性文字。
-数组中每个对象包含：
-- "title": 标题文本
-- "keywords": 关键标签
-- "score": 推荐指数(1-100)`
+数组中每个对象必须包含以下字段：
+- "mainTitle": 主标题（核心卖点，具有极强冲击力）
+- "subTitle": 副标题（补充细节、悬念或利益点）
+- "score": 推荐指数(1-100)
+
+请确保每组方案的主副标题配合默契，能够有效提升点击率。`
   },
   SUMMARY: {
     id: 'summary',
