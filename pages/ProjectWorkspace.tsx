@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
+import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus, Type } from '../types';
 import * as storage from '../services/storageService';
 import * as gemini from '../services/geminiService';
 import { 
-  ArrowLeft, Layout, FileText, Type, 
+  ArrowLeft, Layout, FileText, Type as TypeIcon, 
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play, Pause,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
@@ -50,7 +50,6 @@ const MiniInlineCopy = ({ text }: { text: string }) => {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
     if (!text) return;
-    // 移除副标题两侧的连字符装饰再复制
     const cleanText = text.replace(/^- | -$/g, '');
     navigator.clipboard.writeText(cleanText);
     setCopied(true);
@@ -255,7 +254,7 @@ const TextResultBox = ({ content, title, onSave, placeholder, showStats, readOnl
       <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-3"><h4 className="text-xs font-bold text-slate-500 uppercase">{title}</h4>{showStats && <span className="text-[10px] bg-white px-2 py-0.5 rounded border font-bold text-indigo-600 border-indigo-100">{stats(val)}</span>}</div>
         <div className="flex items-center gap-2">
-            {!readOnly && onSave && dirty && <button onClick={() => { onSave(val); setDirty(false); }} className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">保存</button>}
+            {!readOnly && onSave && dirty && <button onClick={() => { onSave(val); setDirty(false); }} className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">保存 (8s)</button>}
             <RowCopyButton text={val} />
         </div>
       </div>
@@ -273,7 +272,7 @@ const NODE_HEIGHT = 160;
 const NODES_CONFIG = [
   { id: 'input', label: '项目输入', panelTitle: '项目策划', icon: Layout, color: 'blue', description: '定义主题与基调', x: 50, y: 300 },
   { id: 'script', label: '视频脚本', panelTitle: '脚本编辑器', icon: FileText, color: 'violet', promptKey: 'SCRIPT', description: '生成完整口播文案', x: 450, y: 300 },
-  { id: 'titles', label: '爆款标题', panelTitle: '标题策划', icon: Type, color: 'amber', promptKey: 'TITLES', description: '生成高点击率标题', x: 850, y: 100 },
+  { id: 'titles', label: '爆款标题', panelTitle: '标题策划', icon: TypeIcon, color: 'amber', promptKey: 'TITLES', description: '生成高点击率标题', x: 850, y: 100 },
   { id: 'audio_file', label: '上传MP3', panelTitle: '音频文件', icon: FileAudio, color: 'fuchsia', description: '上传配音/BGM', x: 850, y: 300 },
   { id: 'summary', label: '简介标签', panelTitle: '发布元数据', icon: List, color: 'emerald', promptKey: 'SUMMARY', description: 'SEO 简介与标签', x: 850, y: 500 },
   { id: 'cover', label: '封面策划', panelTitle: '封面方案', icon: Palette, color: 'rose', promptKey: 'COVER_GEN', description: '画面描述与文案', x: 850, y: 700 },
@@ -295,9 +294,9 @@ const ProjectWorkspace: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const [syncStatus, setSyncStatus] = useState<any>(null);
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const [customKey, setCustomKey] = useState('');
   const audioInputRef = useRef<HTMLInputElement>(null);
+  // Fixed: Cannot find namespace 'NodeJS'. Use ReturnType<typeof setTimeout>
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -307,19 +306,31 @@ const ProjectWorkspace: React.FC = () => {
             setLoading(false);
         }
         setPrompts(await storage.getPrompts());
-        setCustomKey(localStorage.getItem('lva_custom_api_key') || '');
     };
     init();
+    return () => { if(saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   }, [id]);
 
-  const updateProjectAndSyncImmediately = async (updated: ProjectData) => {
+  /**
+   * 8秒防抖保存逻辑
+   * 操作后立即更新状态，但延迟 8 秒后再执行数据库写入和同步
+   */
+  const updateProjectAndSyncImmediately = (updated: ProjectData) => {
       setProject(updated);
-      await storage.saveProject(updated);
-      setSyncStatus('saving');
-      try {
-          await storage.uploadProjects();
-          setSyncStatus('synced');
-      } catch { setSyncStatus('error'); }
+      setSyncStatus('pending'); // UI 显示“变更待保存”
+      
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      
+      saveTimerRef.current = setTimeout(async () => {
+          setSyncStatus('saving');
+          try {
+              await storage.saveProject(updated);
+              await storage.uploadProjects();
+              setSyncStatus('synced');
+          } catch { 
+              setSyncStatus('error'); 
+          }
+      }, 8000);
   };
 
   const handleNodeAction = async (nodeId: string) => {
@@ -334,31 +345,27 @@ const ProjectWorkspace: React.FC = () => {
         const template = config?.promptKey ? prompts[config.promptKey]?.template : '';
 
         if (nodeId === 'script') {
-            let text = await gemini.generateText(prompts['SCRIPT'].template.replace(/\{\{topic\}\}/g, project.inputs.topic || project.title).replace(/\{\{tone\}\}/g, project.inputs.tone).replace(/\{\{language\}\}/g, project.inputs.language), customKey);
+            let text = await gemini.generateText(prompts['SCRIPT'].template.replace(/\{\{topic\}\}/g, project.inputs.topic || project.title).replace(/\{\{tone\}\}/g, project.inputs.tone).replace(/\{\{language\}\}/g, project.inputs.language));
             update = { script: text.replace(/\*/g, '') };
         } else if (nodeId === 'titles') {
             const schema = { type: "ARRAY", items: { type: "OBJECT", properties: { mainTitle: { type: "STRING" }, subTitle: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["mainTitle", "subTitle", "score"] } };
-            update = { titles: await gemini.generateJSON(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''), schema, customKey) };
+            update = { titles: await gemini.generateJSON(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''), schema) };
         } else if (nodeId === 'summary') {
-            let text = (await gemini.generateText(template.replace(/\{\{script\}\}/g, project.script || ''), customKey)).trim();
+            let text = (await gemini.generateText(template.replace(/\{\{script\}\}/g, project.script || ''))).trim();
             if (!text) throw new Error("AI 返回内容为空");
             update = { summary: text.replace(/\*/g, '') };
         } else if (nodeId === 'cover') {
             const schema = { type: "ARRAY", items: { type: "OBJECT", properties: { visual: { type: "STRING" }, titleTop: { type: "STRING" }, titleBottom: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["visual", "titleTop", "titleBottom"] } };
-            update = { coverOptions: await gemini.generateJSON(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''), schema, customKey) };
+            update = { coverOptions: await gemini.generateJSON(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''), schema) };
         }
 
         const now = Date.now();
         const nextProject = { ...project, ...update, moduleTimestamps: { ...(project.moduleTimestamps || {}), [nodeId]: now } };
-        await updateProjectAndSyncImmediately(nextProject);
+        updateProjectAndSyncImmediately(nextProject);
 
     } catch (e: any) { alert(`生成失败: ${e.message}`); } finally { setGeneratingNodes(prev => { const n = new Set(prev); n.delete(nodeId); return n; }); }
   };
 
-  /**
-   * 一键生成逻辑：仅针对 3（爆款标题）、5（简介标签）、6（封面策划）
-   * 规则：如果某个模块已经有内容，则跳过该模块。
-   */
   const handleOneClickBatchGenerate = async () => {
     if (!project) return;
     if (!project.script) {
@@ -366,7 +373,6 @@ const ProjectWorkspace: React.FC = () => {
         return;
     }
 
-    // 检查哪些模块需要生成
     const needsTitles = !project.titles || project.titles.length === 0;
     const needsSummary = !project.summary || project.summary.trim() === '';
     const needsCover = !project.coverOptions || project.coverOptions.length === 0;
@@ -395,11 +401,10 @@ const ProjectWorkspace: React.FC = () => {
         const titleSchema = { type: "ARRAY", items: { type: "OBJECT", properties: { mainTitle: { type: "STRING" }, subTitle: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["mainTitle", "subTitle", "score"] } };
         const coverSchema = { type: "ARRAY", items: { type: "OBJECT", properties: { visual: { type: "STRING" }, titleTop: { type: "STRING" }, titleBottom: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["visual", "titleTop", "titleBottom"] } };
 
-        // 并行调用 AI，但只调用缺失部分的任务
         const tasks: Promise<any>[] = [];
-        if (needsTitles) tasks.push(gemini.generateJSON<TitleItem[]>(titlePrompt, titleSchema, customKey)); else tasks.push(Promise.resolve(null));
-        if (needsSummary) tasks.push(gemini.generateText(summaryPrompt, customKey).then(res => res.trim().replace(/\*/g, ''))); else tasks.push(Promise.resolve(null));
-        if (needsCover) tasks.push(gemini.generateJSON<CoverOption[]>(coverPrompt, coverSchema, customKey)); else tasks.push(Promise.resolve(null));
+        if (needsTitles) tasks.push(gemini.generateJSON<TitleItem[]>(titlePrompt, titleSchema)); else tasks.push(Promise.resolve(null));
+        if (needsSummary) tasks.push(gemini.generateText(summaryPrompt).then(res => res.trim().replace(/\*/g, ''))); else tasks.push(Promise.resolve(null));
+        if (needsCover) tasks.push(gemini.generateJSON<CoverOption[]>(coverPrompt, coverSchema)); else tasks.push(Promise.resolve(null));
 
         const [titlesResult, summaryResult, coverResult] = await Promise.all(tasks);
 
@@ -417,7 +422,7 @@ const ProjectWorkspace: React.FC = () => {
             }
         };
 
-        await updateProjectAndSyncImmediately(nextProject);
+        updateProjectAndSyncImmediately(nextProject);
 
     } catch (e: any) {
         alert(`一键生成部分失败: ${e.message}`);
@@ -459,7 +464,12 @@ const ProjectWorkspace: React.FC = () => {
       setIsUploading(true);
       try {
           const url = await storage.uploadFile(pendingAudio.file, project.id, p => setUploadProgress(p));
-          await updateProjectAndSyncImmediately({ ...project, audioFile: url, moduleTimestamps: { ...(project.moduleTimestamps || {}), audio_file: Date.now() } });
+          // 音频上传由于是文件操作，直接触发保存同步
+          const updated = { ...project, audioFile: url, moduleTimestamps: { ...(project.moduleTimestamps || {}), audio_file: Date.now() } };
+          setProject(updated);
+          await storage.saveProject(updated);
+          await storage.uploadProjects();
+          setSyncStatus('synced');
           setPendingAudio(null);
       } catch { alert('上传失败'); } finally { setIsUploading(false); }
   };
@@ -474,10 +484,9 @@ const ProjectWorkspace: React.FC = () => {
              <h1 className="text-2xl font-black text-slate-400 select-none">{project.title}</h1>
         </div>
         <div className="absolute top-4 right-4 z-20 flex items-center gap-3">
-            <button onClick={() => setShowConfigModal(true)} className="h-9 px-3 bg-white/80 border rounded-lg flex items-center gap-2 text-xs font-bold"><Settings2 className="w-4 h-4" /> API</button>
-            <div className={`text-[10px] font-bold px-3 py-1.5 rounded-full border bg-white/90 shadow-sm flex items-center gap-1.5 ${syncStatus === 'synced' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                {syncStatus === 'saving' ? <Loader2 className="w-3 h-3 animate-spin" /> : syncStatus === 'synced' ? <CloudCheck className="w-3 h-3" /> : <Cloud className="w-3 h-3" />}
-                {syncStatus === 'saving' ? '保存同步中...' : syncStatus === 'synced' ? '已同步云端' : '就绪'}
+            <div className={`text-[10px] font-bold px-3 py-1.5 rounded-full border bg-white/90 shadow-sm flex items-center gap-1.5 ${syncStatus === 'synced' ? 'text-emerald-600' : syncStatus === 'pending' ? 'text-amber-600 animate-pulse' : 'text-slate-400'}`}>
+                {syncStatus === 'saving' ? <Loader2 className="w-3 h-3 animate-spin" /> : syncStatus === 'synced' ? <CloudCheck className="w-3 h-3" /> : syncStatus === 'pending' ? <Clock className="w-3 h-3" /> : <Cloud className="w-3 h-3" />}
+                {syncStatus === 'saving' ? '正在写入同步...' : syncStatus === 'synced' ? '已同步云端' : syncStatus === 'pending' ? '变更待保存 (8s)' : '就绪'}
             </div>
             <button 
                 onClick={handleOneClickBatchGenerate} 
@@ -665,20 +674,6 @@ const ProjectWorkspace: React.FC = () => {
                  )}
             </div>
         </div>
-
-        {showConfigModal && (
-            <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative">
-                    <button onClick={() => setShowConfigModal(false)} className="absolute top-4 right-4 text-slate-400"><X className="w-5 h-5" /></button>
-                    <h3 className="text-xl font-bold mb-6">API 配置</h3>
-                    <div className="space-y-4">
-                        <div><label className="text-xs font-bold text-slate-500 uppercase block mb-2">Gemini API Key</label>
-                        <input type="password" value={customKey} onChange={(e) => setCustomKey(e.target.value)} className="w-full bg-slate-50 border rounded-xl px-4 py-3 outline-none" placeholder="sk-..." /></div>
-                        <button onClick={() => { localStorage.setItem('lva_custom_api_key', customKey); setShowConfigModal(false); }} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold">保存设置</button>
-                    </div>
-                </div>
-            </div>
-        )}
     </div>
   );
 };
