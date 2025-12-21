@@ -46,6 +46,27 @@ const RowCopyButton = ({ text }: { text: string }) => {
   );
 };
 
+const MiniInlineCopy = ({ text }: { text: string }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    if (!text) return;
+    // 移除副标题两侧的连字符装饰再复制
+    const cleanText = text.replace(/^- | -$/g, '');
+    navigator.clipboard.writeText(cleanText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button 
+      onClick={(e) => { e.stopPropagation(); handleCopy(); }} 
+      className="opacity-0 group-hover/cell:opacity-100 p-1 ml-1 text-slate-300 hover:text-indigo-600 transition-all rounded bg-white shadow-sm border border-slate-100" 
+      title="复制内容"
+    >
+      {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+    </button>
+  );
+};
+
 const FancyAudioPlayer = ({ src, fileName, downloadName, isLocal, onReplace, onDelete, isUploading, uploadProgress, onUpload }: any) => {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -581,12 +602,10 @@ const ProjectWorkspace: React.FC = () => {
                                         <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">视觉主标题 (2-4字)</th>
                                         <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">心理副标题 (6-12字)</th>
                                         <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-20">得分 (10分制)</th>
-                                        <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-10"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {project.titles?.map((t, i) => {
-                                        // 增加防御性代码：如果 t 是字符串（旧数据）或对象格式不正确，进行兼容处理
                                         const isObject = typeof t === 'object' && t !== null;
                                         const main = isObject ? (t.mainTitle || '') : (typeof t === 'string' ? t : '未知标题');
                                         const sub = isObject ? (t.subTitle || '') : '';
@@ -595,26 +614,29 @@ const ProjectWorkspace: React.FC = () => {
                                         return (
                                             <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
                                                 <td className="py-4 px-3 text-center text-xs font-bold text-slate-400 align-top">{String.fromCharCode(65 + (i % 26))}</td>
-                                                <td className="py-4 px-3">
-                                                    <div className="text-sm font-black text-slate-800 leading-tight">{main}</div>
+                                                <td className="py-4 px-3 group/cell">
+                                                    <div className="flex items-center gap-1">
+                                                        <div className="text-sm font-black text-slate-800 leading-tight">{main}</div>
+                                                        <MiniInlineCopy text={main} />
+                                                    </div>
                                                 </td>
-                                                <td className="py-4 px-3">
-                                                    <div className="text-[11px] font-bold text-slate-500 leading-relaxed">{sub ? `- ${sub} -` : ''}</div>
+                                                <td className="py-4 px-3 group/cell">
+                                                    <div className="flex items-center gap-1">
+                                                        <div className="text-[11px] font-bold text-slate-500 leading-relaxed">{sub ? `- ${sub} -` : ''}</div>
+                                                        {sub && <MiniInlineCopy text={sub} />}
+                                                    </div>
                                                 </td>
                                                 <td className="py-4 px-3 text-center align-top">
                                                     <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${scoreValue >= 9 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
                                                         {scoreValue.toFixed(1)}
                                                     </span>
                                                 </td>
-                                                <td className="py-4 px-3 text-center align-top">
-                                                    <RowCopyButton text={`${main}${sub ? '\n' + sub : ''}`} />
-                                                </td>
                                             </tr>
                                         );
                                     })}
                                     {(!project.titles || project.titles.length === 0) && (
                                         <tr>
-                                            <td colSpan={5} className="py-20 text-center text-slate-300 italic text-xs">暂无生成方案</td>
+                                            <td colSpan={4} className="py-20 text-center text-slate-300 italic text-xs">暂无生成方案</td>
                                         </tr>
                                     )}
                                 </tbody>
