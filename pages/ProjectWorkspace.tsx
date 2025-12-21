@@ -316,7 +316,8 @@ const ProjectWorkspace: React.FC = () => {
             let text = await gemini.generateText(prompts['SCRIPT'].template.replace(/\{\{topic\}\}/g, project.inputs.topic || project.title).replace(/\{\{tone\}\}/g, project.inputs.tone).replace(/\{\{language\}\}/g, project.inputs.language), customKey);
             update = { script: text.replace(/\*/g, '') };
         } else if (nodeId === 'titles') {
-            update = { titles: await gemini.generateJSON(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''), undefined, customKey) };
+            const schema = { type: "ARRAY", items: { type: "OBJECT", properties: { mainTitle: { type: "STRING" }, subTitle: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["mainTitle", "subTitle", "score"] } };
+            update = { titles: await gemini.generateJSON(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''), schema, customKey) };
         } else if (nodeId === 'summary') {
             let text = (await gemini.generateText(template.replace(/\{\{script\}\}/g, project.script || ''), customKey)).trim();
             if (!text) throw new Error("AI 返回内容为空");
@@ -369,11 +370,13 @@ const ProjectWorkspace: React.FC = () => {
         const titlePrompt = prompts['TITLES'].template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || '');
         const summaryPrompt = prompts['SUMMARY'].template.replace(/\{\{script\}\}/g, project.script || '');
         const coverPrompt = prompts['COVER_GEN'].template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || '');
+        
+        const titleSchema = { type: "ARRAY", items: { type: "OBJECT", properties: { mainTitle: { type: "STRING" }, subTitle: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["mainTitle", "subTitle", "score"] } };
         const coverSchema = { type: "ARRAY", items: { type: "OBJECT", properties: { visual: { type: "STRING" }, titleTop: { type: "STRING" }, titleBottom: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["visual", "titleTop", "titleBottom"] } };
 
         // 并行调用 AI，但只调用缺失部分的任务
         const tasks: Promise<any>[] = [];
-        if (needsTitles) tasks.push(gemini.generateJSON<TitleItem[]>(titlePrompt, undefined, customKey)); else tasks.push(Promise.resolve(null));
+        if (needsTitles) tasks.push(gemini.generateJSON<TitleItem[]>(titlePrompt, titleSchema, customKey)); else tasks.push(Promise.resolve(null));
         if (needsSummary) tasks.push(gemini.generateText(summaryPrompt, customKey).then(res => res.trim().replace(/\*/g, ''))); else tasks.push(Promise.resolve(null));
         if (needsCover) tasks.push(gemini.generateJSON<CoverOption[]>(coverPrompt, coverSchema, customKey)); else tasks.push(Promise.resolve(null));
 
@@ -582,25 +585,33 @@ const ProjectWorkspace: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {project.titles?.map((t, i) => (
-                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
-                                            <td className="py-4 px-3 text-center text-xs font-bold text-slate-400 align-top">{String.fromCharCode(65 + (i % 26))}</td>
-                                            <td className="py-4 px-3">
-                                                <div className="text-sm font-black text-slate-800 leading-tight">{t.mainTitle}</div>
-                                            </td>
-                                            <td className="py-4 px-3">
-                                                <div className="text-[11px] font-bold text-slate-500 leading-relaxed">- {t.subTitle} -</div>
-                                            </td>
-                                            <td className="py-4 px-3 text-center align-top">
-                                                <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${t.score >= 9 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                                                    {t.score.toFixed(1)}
-                                                </span>
-                                            </td>
-                                            <td className="py-4 px-3 text-center align-top">
-                                                <RowCopyButton text={`${t.mainTitle}\n${t.subTitle}`} />
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {project.titles?.map((t, i) => {
+                                        // 增加防御性代码：如果 t 是字符串（旧数据）或对象格式不正确，进行兼容处理
+                                        const isObject = typeof t === 'object' && t !== null;
+                                        const main = isObject ? (t.mainTitle || '') : (typeof t === 'string' ? t : '未知标题');
+                                        const sub = isObject ? (t.subTitle || '') : '';
+                                        const scoreValue = isObject ? (typeof t.score === 'number' ? t.score : parseFloat(t.score as any) || 0) : 0;
+                                        
+                                        return (
+                                            <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
+                                                <td className="py-4 px-3 text-center text-xs font-bold text-slate-400 align-top">{String.fromCharCode(65 + (i % 26))}</td>
+                                                <td className="py-4 px-3">
+                                                    <div className="text-sm font-black text-slate-800 leading-tight">{main}</div>
+                                                </td>
+                                                <td className="py-4 px-3">
+                                                    <div className="text-[11px] font-bold text-slate-500 leading-relaxed">{sub ? `- ${sub} -` : ''}</div>
+                                                </td>
+                                                <td className="py-4 px-3 text-center align-top">
+                                                    <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${scoreValue >= 9 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                                        {scoreValue.toFixed(1)}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-3 text-center align-top">
+                                                    <RowCopyButton text={`${main}${sub ? '\n' + sub : ''}`} />
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                     {(!project.titles || project.titles.length === 0) && (
                                         <tr>
                                             <td colSpan={5} className="py-20 text-center text-slate-300 italic text-xs">暂无生成方案</td>
