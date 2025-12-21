@@ -569,14 +569,44 @@ const ProjectWorkspace: React.FC = () => {
                      </div>
                  )}
                  {selectedNodeId === 'titles' && (
-                     <div className="p-6 h-full overflow-y-auto">
-                        <div className="space-y-3">
-                            {project.titles?.map((t, i) => (
-                                <div key={i} className="bg-white p-4 rounded-xl border flex justify-between items-center group">
-                                    <div className="font-bold text-slate-700 text-sm">{t.title}</div>
-                                    <RowCopyButton text={t.title} />
-                                </div>
-                            ))}
+                     <div className="p-4 h-full overflow-y-auto">
+                        <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-slate-50 border-b">
+                                    <tr>
+                                        <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-12">序号</th>
+                                        <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">爆款方案</th>
+                                        <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-16">得分</th>
+                                        <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {project.titles?.map((t, i) => (
+                                        <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
+                                            <td className="py-4 px-3 text-center text-xs font-bold text-slate-400 align-top">{i + 1}</td>
+                                            <td className="py-4 px-3">
+                                                <div className="space-y-1">
+                                                    <div className="text-sm font-black text-slate-800 leading-tight">{t.mainTitle}</div>
+                                                    <div className="text-[11px] font-bold text-slate-400">{t.subTitle}</div>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-3 text-center align-top">
+                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${t.score >= 90 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                                    {t.score}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 px-3 text-center align-top">
+                                                <RowCopyButton text={`${t.mainTitle}\n${t.subTitle}`} />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {(!project.titles || project.titles.length === 0) && (
+                                        <tr>
+                                            <td colSpan={4} className="py-20 text-center text-slate-300 italic text-xs">暂无生成方案</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                      </div>
                  )}
@@ -620,4 +650,3 @@ const ProjectWorkspace: React.FC = () => {
 };
 
 export default ProjectWorkspace;
-
