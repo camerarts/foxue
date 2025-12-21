@@ -1,12 +1,13 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { PromptTemplate, DEFAULT_PROMPTS } from '../types';
 import * as storage from '../services/storageService';
-import { Save, RefreshCw, AlertTriangle, ClipboardPaste, Check, Maximize2, X, Loader2, Copy, Cloud, CloudCheck, AlertCircle } from 'lucide-react';
+import { Save, RefreshCw, AlertTriangle, ClipboardPaste, Check, Maximize2, X, Loader2, Copy, Cloud, CloudCheck, AlertCircle, Clock } from 'lucide-react';
 
 const Settings: React.FC = () => {
   const [prompts, setPrompts] = useState<Record<string, PromptTemplate>>({});
   const [loading, setLoading] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'synced' | 'error'>('idle');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'synced' | 'error' | 'pending'>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [refreshTime, setRefreshTime] = useState('');
@@ -25,10 +26,7 @@ const Settings: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
-        // 1. 检查本地是否有自定义配置
         const localDataRaw = localStorage.getItem('lva_prompts');
-        
-        // 2. 如果本地为空，则从服务器拉取最新数据
         if (!localDataRaw) {
             setSyncStatus('saving');
             try {
@@ -39,8 +37,6 @@ const Settings: React.FC = () => {
                 setSyncStatus('error');
             }
         }
-        
-        // 3. 加载最终数据（本地或刚下载的）
         const data = await storage.getPrompts();
         setPrompts(data);
         setRefreshTime(`上次云端同步：${storage.getLastUploadTime()}`);
@@ -49,28 +45,26 @@ const Settings: React.FC = () => {
     init();
   }, []);
 
-  // 监听 prompts 变动，自动保存并上传
+  // 监听 prompts 变动，设置页面改为 1 秒即时保存
   useEffect(() => {
     if (!isInitialized.current) return;
+
+    setSyncStatus('pending'); 
 
     const autoSave = async () => {
         setSyncStatus('saving');
         try {
-            // 保存到本地 IndexedDB/LocalStorage
             await storage.savePrompts(prompts);
-            
-            // 立即同步到服务器
             await storage.uploadPrompts();
-            
             setSyncStatus('synced');
-            setRefreshTime(`自动保存时间：${new Date().toLocaleTimeString()}`);
+            setRefreshTime(`保存完成：${new Date().toLocaleTimeString()}`);
         } catch (e) {
             console.error("Auto-sync prompts failed", e);
             setSyncStatus('error');
         }
     };
 
-    const timer = setTimeout(autoSave, 1000); // 1秒防抖
+    const timer = setTimeout(autoSave, 1000); 
     return () => clearTimeout(timer);
   }, [prompts]);
 
@@ -108,20 +102,22 @@ const Settings: React.FC = () => {
       <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-end mb-6 md:mb-10">
         <div>
           <h1 className="text-2xl md:text-4xl font-extrabold text-slate-900 mb-0.5 md:mb-2 tracking-tight">AI 提示词配置</h1>
-          <p className="text-xs md:text-base text-slate-500 font-medium">配置将实时自动保存并同步至云端。</p>
+          <p className="text-xs md:text-base text-slate-500 font-medium">设置页面的修改将即时保存并同步至云端。</p>
         </div>
         <div className="flex flex-col items-end gap-2">
             <div className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border bg-white shadow-sm transition-all ${
                 syncStatus === 'synced' ? 'text-emerald-600 border-emerald-100' :
                 syncStatus === 'saving' ? 'text-blue-600 border-blue-100' :
+                syncStatus === 'pending' ? 'text-amber-600 border-amber-100 animate-pulse' :
                 syncStatus === 'error' ? 'text-rose-600 border-rose-100' :
                 'text-slate-400 border-slate-100'
             }`}>
                 {syncStatus === 'synced' ? <CloudCheck className="w-3.5 h-3.5" /> : 
                  syncStatus === 'saving' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 
+                 syncStatus === 'pending' ? <Clock className="w-3.5 h-3.5" /> :
                  syncStatus === 'error' ? <AlertCircle className="w-3.5 h-3.5" /> :
                  <Cloud className="w-3.5 h-3.5" />}
-                {syncStatus === 'synced' ? '已同步云端' : syncStatus === 'saving' ? '保存同步中...' : syncStatus === 'error' ? '同步失败' : '就绪'}
+                {syncStatus === 'synced' ? '已同步云端' : syncStatus === 'saving' ? '同步中...' : syncStatus === 'pending' ? '正在保存...' : syncStatus === 'error' ? '同步失败' : '就绪'}
             </div>
             <span className="text-[10px] font-bold text-slate-400 tracking-wider">
                 {refreshTime}
@@ -142,9 +138,9 @@ const Settings: React.FC = () => {
                 <AlertTriangle className="w-5 h-5" />
             </div>
             <div className="space-y-1">
-                <p className="font-bold text-indigo-900 text-sm">实时同步指南</p>
+                <p className="font-bold text-indigo-900 text-sm">即时同步模式</p>
                 <p className="text-xs text-indigo-700/80 leading-relaxed">
-                    任何修改都会在 1 秒后自动上传至服务器。如果本地为空，系统会自动尝试恢复云端备份。
+                    设置页面的任何修改都会立即生效并自动上传至云端数据库。
                 </p>
             </div>
         </div>
