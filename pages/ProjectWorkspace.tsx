@@ -575,24 +575,25 @@ const ProjectWorkspace: React.FC = () => {
                                 <thead className="bg-slate-50 border-b">
                                     <tr>
                                         <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-12">序号</th>
-                                        <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">爆款方案</th>
-                                        <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-16">得分</th>
+                                        <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">视觉主标题 (2-4字)</th>
+                                        <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">心理副标题 (6-12字)</th>
+                                        <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-20">得分 (10分制)</th>
                                         <th className="py-3 px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-10"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {project.titles?.map((t, i) => (
                                         <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
-                                            <td className="py-4 px-3 text-center text-xs font-bold text-slate-400 align-top">{i + 1}</td>
+                                            <td className="py-4 px-3 text-center text-xs font-bold text-slate-400 align-top">{String.fromCharCode(65 + (i % 26))}</td>
                                             <td className="py-4 px-3">
-                                                <div className="space-y-1">
-                                                    <div className="text-sm font-black text-slate-800 leading-tight">{t.mainTitle}</div>
-                                                    <div className="text-[11px] font-bold text-slate-400">{t.subTitle}</div>
-                                                </div>
+                                                <div className="text-sm font-black text-slate-800 leading-tight">{t.mainTitle}</div>
+                                            </td>
+                                            <td className="py-4 px-3">
+                                                <div className="text-[11px] font-bold text-slate-500 leading-relaxed">- {t.subTitle} -</div>
                                             </td>
                                             <td className="py-4 px-3 text-center align-top">
-                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${t.score >= 90 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                                                    {t.score}
+                                                <span className={`text-[11px] font-black px-2 py-0.5 rounded-full border ${t.score >= 9 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                                    {t.score.toFixed(1)}
                                                 </span>
                                             </td>
                                             <td className="py-4 px-3 text-center align-top">
@@ -602,7 +603,7 @@ const ProjectWorkspace: React.FC = () => {
                                     ))}
                                     {(!project.titles || project.titles.length === 0) && (
                                         <tr>
-                                            <td colSpan={4} className="py-20 text-center text-slate-300 italic text-xs">暂无生成方案</td>
+                                            <td colSpan={5} className="py-20 text-center text-slate-300 italic text-xs">暂无生成方案</td>
                                         </tr>
                                     )}
                                 </tbody>
