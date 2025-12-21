@@ -3,16 +3,17 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProjectData, ProjectStatus } from '../types';
 import * as storage from '../services/storageService';
-import { Calendar, Trash2, Plus, Sparkles, Loader2, Cloud, CloudCheck, AlertCircle, FolderOpen, Video, Archive } from 'lucide-react';
+import { Calendar, Trash2, Plus, Sparkles, Loader2, Cloud, CloudCheck, AlertCircle, FolderOpen, Video, Archive, Clock } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'synced' | 'error' | null>(null);
+  const [syncStatus, setSyncStatus] = useState<'saved' | 'saving' | 'synced' | 'error' | 'pending' | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState('');
-
+  
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastActivityRef = useRef(Date.now());
   const isBusyRef = useRef(false);
 
@@ -47,7 +48,10 @@ const Dashboard: React.FC = () => {
           timeoutId = setTimeout(performSync, 5 * 60 * 1000);
       };
       timeoutId = setTimeout(performSync, 5 * 60 * 1000);
-      return () => clearTimeout(timeoutId);
+      return () => {
+          clearTimeout(timeoutId);
+          if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      };
   }, []);
 
   useEffect(() => {
@@ -119,9 +123,7 @@ const Dashboard: React.FC = () => {
     e.stopPropagation();
     if (window.confirm('确定要归档此项目吗？归档后项目将移入归档仓库，仅供只读浏览。')) {
         await storage.archiveProject(id);
-        // Remove locally from display list
         setProjects(prev => prev.filter(p => p.id !== id));
-        // Trigger Sync
         setSyncStatus('saving');
         try {
             await storage.uploadProjects();
@@ -137,20 +139,24 @@ const Dashboard: React.FC = () => {
       e.stopPropagation();
       const updated = { ...project, marked: !project.marked };
       
-      // Optimistic update
+      // 立即更新 UI 状态
       setProjects(prev => prev.map(p => p.id === project.id ? updated : p));
+      setSyncStatus('pending'); // 设置为待保存状态
       
-      await storage.saveProject(updated);
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       
-      // Background sync
-      setSyncStatus('saving');
-      try {
-          await storage.uploadProjects();
-          setSyncStatus('synced');
-          setLastSyncTime(new Date().toLocaleTimeString());
-      } catch(e) {
-          setSyncStatus('error');
-      }
+      // 8 秒后执行持久化和云端同步
+      saveTimerRef.current = setTimeout(async () => {
+          setSyncStatus('saving');
+          try {
+              await storage.saveProject(updated);
+              await storage.uploadProjects();
+              setSyncStatus('synced');
+              setLastSyncTime(new Date().toLocaleTimeString());
+          } catch { 
+              setSyncStatus('error'); 
+          }
+      }, 8000);
   };
 
   const isProjectFullyComplete = (p: ProjectData) => {
@@ -195,16 +201,18 @@ const Dashboard: React.FC = () => {
           <p className="text-sm font-medium text-slate-500">管理您的所有视频创作项目</p>
         </div>
         <div className="flex flex-col items-end gap-2">
-            <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full border shadow-sm transition-all ${
+            <div className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border shadow-sm transition-all ${
                 syncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                 syncStatus === 'saving' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                syncStatus === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse' :
                 syncStatus === 'error' ? 'bg-rose-50 text-rose-600 border-rose-100' :
                 'bg-slate-50 text-slate-400 border-slate-100'
             }`}>
                 {syncStatus === 'synced' ? <CloudCheck className="w-3 h-3" /> : 
                  syncStatus === 'saving' ? <Loader2 className="w-3 h-3 animate-spin" /> : 
+                 syncStatus === 'pending' ? <Clock className="w-3 h-3" /> :
                  <Cloud className="w-3 h-3" />}
-                {syncStatus === 'synced' ? '已同步' : syncStatus === 'saving' ? '同步中...' : '准备就绪'}
+                {syncStatus === 'synced' ? '已同步' : syncStatus === 'saving' ? '同步中...' : syncStatus === 'pending' ? '变更待保存 (8s)' : '准备就绪'}
             </div>
         </div>
       </div>
@@ -347,11 +355,8 @@ const Dashboard: React.FC = () => {
                                             <input
                                                 type="checkbox"
                                                 checked={!!project.marked}
-                                                onClick={(e) => e.stopPropagation()} // Stop row click
+                                                onClick={(e) => e.stopPropagation()} 
                                                 onChange={(e) => {
-                                                    // Use e.nativeEvent to avoid React synthetic event issues if needed, 
-                                                    // but simple stopPropagation on container click works best.
-                                                    // Here we use a dedicated handler that stops propagation.
                                                     handleToggleMark(e as any, project);
                                                 }}
                                                 className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
@@ -372,4 +377,3 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
-
