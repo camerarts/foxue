@@ -14,7 +14,8 @@ import LandingPage from './pages/LandingPage';
 import CreateProject from './pages/CreateProject';
 import AiTitles from './pages/AiTitles';
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => (
+// Fix: Updated ProtectedRoute to make children optional or use PropsWithChildren to satisfy JSX requirements
+const ProtectedRoute: React.FC<{ children?: React.ReactNode }> = ({ children }) => (
   <AuthGuard>
     <Layout>{children}</Layout>
   </AuthGuard>
