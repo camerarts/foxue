@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus, Type } from '../types';
+import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
 import * as storage from '../services/storageService';
 import * as gemini from '../services/geminiService';
 import { 
@@ -9,7 +9,7 @@ import {
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play, Pause,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2, Download, Music4, Clock, Settings2, Key, X, ClipboardPaste
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2, Download, Music4, Clock, X, ClipboardPaste
 } from 'lucide-react';
 
 const formatTimestamp = (ts?: number) => {
@@ -66,7 +66,7 @@ const MiniInlineCopy = ({ text }: { text: string }) => {
   );
 };
 
-const FancyAudioPlayer = ({ src, fileName, downloadName, isLocal, onReplace, onDelete, isUploading, uploadProgress, onUpload }: any) => {
+const FancyAudioPlayer = ({ src, fileName, downloadName, isLocal, onReplace, onDelete, isUploading, uploadProgress }: any) => {
     const audioRef = useRef<HTMLAudioElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -171,7 +171,7 @@ const FancyAudioPlayer = ({ src, fileName, downloadName, isLocal, onReplace, onD
                         <h4 className="text-sm font-bold text-slate-800 line-clamp-1 mb-0.5 tracking-tight">{fileName}</h4>
                         <div className="flex items-center gap-1.5">
                             <span className={`w-1.5 h-1.5 rounded-full ${isLocal ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isLocal ? 'Offline Cache' : 'Cloud Synchronized'}</span>
+                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{isLocal ? 'Uploading...' : 'Cloud Synchronized'}</span>
                         </div>
                      </div>
                  </div>
@@ -228,15 +228,11 @@ const FancyAudioPlayer = ({ src, fileName, downloadName, isLocal, onReplace, onD
                     </div>
                  </div>
 
-                 {isLocal && (
-                     <button 
-                        onClick={onUpload} 
-                        disabled={isUploading}
-                        className="h-14 px-6 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl flex items-center gap-3 hover:bg-indigo-700 active:bg-indigo-800 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
-                    >
-                        {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />} 
-                        {isUploading ? `${Math.round(uploadProgress)}%` : 'Sync Cloud'}
-                     </button>
+                 {isUploading && (
+                     <div className="flex items-center gap-3 text-indigo-600">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span className="text-xs font-black uppercase tracking-widest">{Math.round(uploadProgress)}%</span>
+                     </div>
                  )}
              </div>
         </div>
@@ -289,13 +285,11 @@ const ProjectWorkspace: React.FC = () => {
   const [prompts, setPrompts] = useState<Record<string, PromptTemplate>>({});
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [pendingAudio, setPendingAudio] = useState<any>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const [syncStatus, setSyncStatus] = useState<any>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
-  // Fixed: Cannot find namespace 'NodeJS'. Use ReturnType<typeof setTimeout>
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -311,13 +305,9 @@ const ProjectWorkspace: React.FC = () => {
     return () => { if(saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   }, [id]);
 
-  /**
-   * 8秒防抖保存逻辑
-   * 操作后立即更新状态，但延迟 8 秒后再执行数据库写入和同步
-   */
   const updateProjectAndSyncImmediately = (updated: ProjectData) => {
       setProject(updated);
-      setSyncStatus('pending'); // UI 显示“变更待保存”
+      setSyncStatus('pending');
       
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       
@@ -435,6 +425,25 @@ const ProjectWorkspace: React.FC = () => {
     }
   };
 
+  const handleAudioUpload = async (file: File) => {
+    if (!project) return;
+    setIsUploading(true);
+    setUploadProgress(0);
+    try {
+        const url = await storage.uploadFile(file, project.id, p => setUploadProgress(p));
+        const updated = { 
+            ...project, 
+            audioFile: url, 
+            moduleTimestamps: { ...(project.moduleTimestamps || {}), audio_file: Date.now() } 
+        };
+        updateProjectAndSyncImmediately(updated);
+    } catch (err: any) {
+        alert(`音频上传失败: ${err.message}`);
+    } finally {
+        setIsUploading(false);
+    }
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return; 
     setIsDragging(true);
@@ -459,26 +468,11 @@ const ProjectWorkspace: React.FC = () => {
       }
   };
 
-  const executeAudioUpload = async () => {
-      if (!pendingAudio || !project) return;
-      setIsUploading(true);
-      try {
-          const url = await storage.uploadFile(pendingAudio.file, project.id, p => setUploadProgress(p));
-          // 音频上传由于是文件操作，直接触发保存同步
-          const updated = { ...project, audioFile: url, moduleTimestamps: { ...(project.moduleTimestamps || {}), audio_file: Date.now() } };
-          setProject(updated);
-          await storage.saveProject(updated);
-          await storage.uploadProjects();
-          setSyncStatus('synced');
-          setPendingAudio(null);
-      } catch { alert('上传失败'); } finally { setIsUploading(false); }
-  };
-
   if (loading || !project) return <div className="flex h-full items-center justify-center text-slate-400 font-bold">加载中...</div>;
 
   return (
     <div className="flex h-full relative bg-slate-50 overflow-hidden">
-        <input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) setPendingAudio({ file: f, url: URL.createObjectURL(f) }); }} />
+        <input type="file" ref={audioInputRef} className="hidden" accept="audio/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAudioUpload(f); }} />
         <div className="absolute top-6 left-6 z-20 flex items-center gap-3">
              <button onClick={() => navigate('/dashboard')} className="p-2 bg-white/50 rounded-full border hover:bg-white transition-all"><ArrowLeft className="w-5 h-5 text-slate-500" /></button>
              <h1 className="text-2xl font-black text-slate-400 select-none">{project.title}</h1>
@@ -523,7 +517,7 @@ const ProjectWorkspace: React.FC = () => {
                     })}
                 </svg>
                 {NODES_CONFIG.map((n, i) => {
-                    const has = n.id==='input' ? !!project.title : n.id==='script' ? !!project.script : n.id==='titles' ? !!project.titles?.length : n.id==='audio_file' ? !!project.audioFile||!!pendingAudio : n.id==='summary' ? !!project.summary : !!project.coverOptions?.length;
+                    const has = n.id==='input' ? !!project.title : n.id==='script' ? !!project.script : n.id==='titles' ? !!project.titles?.length : n.id==='audio_file' ? !!project.audioFile : n.id==='summary' ? !!project.summary : !!project.coverOptions?.length;
                     const ts = project.moduleTimestamps?.[n.id];
                     return (
                         <div key={n.id} style={{ left: n.x, top: n.y, width: NODE_WIDTH, height: NODE_HEIGHT }} onClick={(e) => { e.stopPropagation(); setSelectedNodeId(n.id); }} className={`absolute rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden bg-white hover:shadow-md ${selectedNodeId===n.id ? 'ring-2 ring-indigo-400' : has ? 'bg-emerald-50/50 border-emerald-100' : ''}`}>
@@ -576,24 +570,23 @@ const ProjectWorkspace: React.FC = () => {
                         </div>
                         <div className="flex-[1] overflow-y-auto min-h-[220px]">
                             <div className="space-y-4">
-                                {(project.audioFile || pendingAudio) && (
+                                {project.audioFile && (
                                     <FancyAudioPlayer 
-                                        src={pendingAudio ? pendingAudio.url : project.audioFile} 
-                                        fileName={pendingAudio ? pendingAudio.file.name : '音频文件.mp3'} 
+                                        src={project.audioFile} 
+                                        fileName={project.audioFile.split('/').pop() || '音频文件.mp3'} 
                                         downloadName={project.title}
-                                        isLocal={!!pendingAudio} 
+                                        isLocal={isUploading} 
                                         isUploading={isUploading} 
                                         uploadProgress={uploadProgress} 
                                         onReplace={() => audioInputRef.current?.click()} 
-                                        onUpload={executeAudioUpload} 
                                     />
                                 )}
-                                {!project.audioFile && !pendingAudio && <div onClick={() => audioInputRef.current?.click()} className="h-40 border-2 border-dashed border-slate-200 bg-white/50 backdrop-blur rounded-[32px] flex flex-col items-center justify-center gap-4 text-slate-400 cursor-pointer hover:bg-white hover:border-indigo-300 hover:text-indigo-600 transition-all group">
+                                {!project.audioFile && <div onClick={() => audioInputRef.current?.click()} className="h-40 border-2 border-dashed border-slate-200 bg-white/50 backdrop-blur rounded-[32px] flex flex-col items-center justify-center gap-4 text-slate-400 cursor-pointer hover:bg-white hover:border-indigo-300 hover:text-indigo-600 transition-all group">
                                     <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center group-hover:bg-indigo-50 transition-all">
-                                        <Upload className="w-8 h-8" />
+                                        {isUploading ? <Loader2 className="w-8 h-8 animate-spin text-indigo-600" /> : <Upload className="w-8 h-8" />}
                                     </div>
                                     <div className="text-center">
-                                        <span className="text-sm font-bold block">点击上传音频</span>
+                                        <span className="text-sm font-bold block">{isUploading ? `正在上传 ${Math.round(uploadProgress)}%` : '点击上传音频'}</span>
                                         <span className="text-[10px] uppercase tracking-widest opacity-60">MP3, WAV, M4A supported</span>
                                     </div>
                                 </div>}
