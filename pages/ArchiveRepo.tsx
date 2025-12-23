@@ -1,9 +1,12 @@
+
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ProjectData, ProjectStatus } from '../types';
 import * as storage from '../services/storageService';
 import { Calendar, Trash2, Loader2, Archive, ArchiveRestore, Cloud, CloudCheck, AlertCircle } from 'lucide-react';
 
 const ArchiveRepo: React.FC = () => {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -100,7 +103,8 @@ const ArchiveRepo: React.FC = () => {
     } catch { setSyncStatus('error'); }
   };
 
-  const handleUnarchive = async (id: string) => {
+  const handleUnarchive = async (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
       if (window.confirm('确定要恢复到项目列表吗？')) {
           await storage.unarchiveProject(id);
           setProjects(prev => prev.map(p => p.id === id ? { ...p, status: ProjectStatus.IN_PROGRESS } : p));
@@ -139,7 +143,6 @@ const ArchiveRepo: React.FC = () => {
                     <thead className="bg-slate-50 text-slate-600">
                         <tr>
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-16 text-center">序号</th>
-                            {/* Increased width from w-40 to w-52 to ensure serial numbers like [2025-01-20-001] don't wrap */}
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-52 text-center">序列号</th>
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider">视频主题</th>
                             <th className="py-4 px-4 text-xs font-bold uppercase tracking-wider w-32 text-center">操作</th>
@@ -149,21 +152,46 @@ const ArchiveRepo: React.FC = () => {
                         {archivedProjects.map((project, index) => {
                             const serial = serialMap.get(project.id) || '-';
                             return (
-                                <tr key={project.id} className="hover:bg-slate-50 transition-colors">
+                                <tr 
+                                    key={project.id} 
+                                    onClick={() => navigate(`/project/${project.id}`)}
+                                    className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                                >
                                     <td className="py-4 px-4 text-center text-sm font-bold text-slate-300">{index + 1}</td>
                                     <td className="py-4 px-4 text-center">
                                         <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded border border-slate-200 whitespace-nowrap">
                                             {serial}
                                         </span>
                                     </td>
-                                    <td className="py-4 px-4"><div className="font-bold text-slate-600 truncate max-w-md">{project.title}</div></td>
+                                    <td className="py-4 px-4">
+                                        <div className="font-bold text-slate-600 truncate max-w-md group-hover:text-indigo-600 transition-colors">
+                                            {project.title}
+                                        </div>
+                                    </td>
                                     <td className="py-4 px-4 text-center">
                                         <div className="flex items-center justify-center gap-2">
-                                            <button onClick={() => handleUnarchive(project.id)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-all" title="恢复项目"><ArchiveRestore className="w-4 h-4" /></button>
+                                            <button 
+                                                onClick={(e) => handleUnarchive(e, project.id)} 
+                                                className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md transition-all" 
+                                                title="恢复项目"
+                                            >
+                                                <ArchiveRestore className="w-4 h-4" />
+                                            </button>
                                             {deleteConfirmId === project.id ? (
-                                                <button onClick={(e) => handleDelete(e, project.id)} className="text-[10px] bg-rose-50 text-rose-600 border border-rose-200 px-2 py-1 rounded font-bold hover:bg-rose-100" onMouseLeave={() => setDeleteConfirmId(null)}>确认删除?</button>
+                                                <button 
+                                                    onClick={(e) => handleDelete(e, project.id)} 
+                                                    className="text-[10px] bg-rose-50 text-rose-600 border border-rose-200 px-2 py-1 rounded font-bold hover:bg-rose-100" 
+                                                    onMouseLeave={() => setDeleteConfirmId(null)}
+                                                >
+                                                    确认删除?
+                                                </button>
                                             ) : (
-                                                <button onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(project.id); }} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-all"><Trash2 className="w-4 h-4" /></button>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(project.id); }} 
+                                                    className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-all"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             )}
                                         </div>
                                     </td>
