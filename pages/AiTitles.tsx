@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as storage from '../services/storageService';
 import * as gemini from '../services/geminiService';
-import { Sparkles, Loader2, Copy, Eraser, Type, Image as ImageIcon, ALargeSmall, Save, Clock, Cloud, CloudCheck, CheckCircle2, Circle, Wand2, Maximize2, X, Download, Rocket } from 'lucide-react';
-import { PromptTemplate, ProjectData, ProjectStatus } from '../types';
+import { Sparkles, Loader2, Copy, Eraser, Type, Image as ImageIcon, ALargeSmall, Clock, Cloud, CloudCheck, CheckCircle2, Circle, Wand2, Maximize2, X, Download, Rocket } from 'lucide-react';
+import { PromptTemplate } from '../types';
 
 interface AiTitleItem {
     title: string;
