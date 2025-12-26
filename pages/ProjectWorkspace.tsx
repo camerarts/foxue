@@ -346,27 +346,13 @@ const ProjectWorkspace: React.FC = () => {
             if (!text) throw new Error("AI 返回内容为空");
             update = { summary: text.replace(/\*/g, '') };
         } else if (nodeId === 'cover') {
-             // 1. Generate Prompt Description
+             // 1. Generate Prompt Description ONLY
             const visualPrompt = await gemini.generateText(
                 template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''),
                 'gemini-2.5-flash-preview-09-2025'
             );
-             
-             // API Key Check for Pro model
-            try {
-                const hasKey = await (window as any).aistudio?.hasSelectedApiKey();
-                if (!hasKey) {
-                    await (window as any).aistudio?.openSelectKey();
-                }
-            } catch (e) { console.warn("AI Studio key check skipped", e); }
-
-             // 2. Generate Image using Pro Model
-            const base64 = await gemini.generateImage(visualPrompt + " Youtube thumbnail, high quality, 4k", 'gemini-3-pro-image-preview');
-             
-             // 3. Upload to Cloud
-            const url = await storage.uploadImage(base64, project.id);
-            // Save BOTH imageUrl AND prompt
-            update = { coverImage: { imageUrl: url, prompt: visualPrompt } };
+            // Don't generate image automatically. Clear existing image to avoid confusion.
+            update = { coverImage: { imageUrl: '', prompt: visualPrompt } };
         }
 
         const now = Date.now();
@@ -374,6 +360,33 @@ const ProjectWorkspace: React.FC = () => {
         updateProjectAndSyncImmediately(nextProject);
 
     } catch (e: any) { alert(`生成失败: ${e.message}`); } finally { setGeneratingNodes(prev => { const n = new Set(prev); n.delete(nodeId); return n; }); }
+  };
+
+  const handleGenerateCoverImage = async () => {
+      if (!project?.coverImage?.prompt) return;
+      setGeneratingNodes(prev => new Set(prev).add('cover_image'));
+      try {
+           // API Key Check for Pro model
+            try {
+                const hasKey = await (window as any).aistudio?.hasSelectedApiKey();
+                if (!hasKey) {
+                    await (window as any).aistudio?.openSelectKey();
+                }
+            } catch (e) { console.warn("AI Studio key check skipped", e); }
+
+          const base64 = await gemini.generateImage(project.coverImage.prompt + " Youtube thumbnail, high quality, 4k", 'gemini-3-pro-image-preview');
+          const url = await storage.uploadImage(base64, project.id);
+          
+          const updated = { 
+              ...project, 
+              coverImage: { ...project.coverImage, imageUrl: url } 
+          };
+          updateProjectAndSyncImmediately(updated);
+      } catch (e: any) {
+          alert(`生图失败: ${e.message}`);
+      } finally {
+          setGeneratingNodes(prev => { const n = new Set(prev); n.delete('cover_image'); return n; });
+      }
   };
 
   const handleOneClickBatchGenerate = async () => {
@@ -385,7 +398,8 @@ const ProjectWorkspace: React.FC = () => {
 
     const needsTitles = !project.titles || project.titles.length === 0;
     const needsSummary = !project.summary || project.summary.trim() === '';
-    const needsCover = !project.coverImage || !project.coverImage.imageUrl;
+    // Check for prompt, not image
+    const needsCover = !project.coverImage || !project.coverImage.prompt;
 
     const actualTargets: string[] = [];
     if (needsTitles) actualTargets.push('titles');
@@ -393,7 +407,7 @@ const ProjectWorkspace: React.FC = () => {
     if (needsCover) actualTargets.push('cover');
 
     if (actualTargets.length === 0) {
-        alert("目标模块（标题、简介、封面）均已有内容，已跳过生成。如需重新生成，请进入单个模块点击“重选”。");
+        alert("目标模块（标题、简介、封面提示词）均已有内容，已跳过生成。如需重新生成，请进入单个模块点击“重选”。");
         return;
     }
     
@@ -417,26 +431,15 @@ const ProjectWorkspace: React.FC = () => {
         
         const [titlesResult, summaryResult] = await Promise.all(textTasks);
 
-        // Generate Cover Image (Sequential to avoid overload)
+        // Generate Cover Prompt Only (Sequential)
         let coverResult: { imageUrl: string; prompt?: string } | null = null;
         if (needsCover) {
             const visualPrompt = await gemini.generateText(
                 coverTemplate,
                 'gemini-2.5-flash-preview-09-2025'
             );
-            
-            // API Key Check for Pro model
-            try {
-                const hasKey = await (window as any).aistudio?.hasSelectedApiKey();
-                if (!hasKey) {
-                    await (window as any).aistudio?.openSelectKey();
-                }
-            } catch (e) { console.warn("AI Studio key check skipped", e); }
-
-            const base64 = await gemini.generateImage(visualPrompt + " Youtube thumbnail, high quality, 4k", 'gemini-3-pro-image-preview');
-            const url = await storage.uploadImage(base64, project.id);
-            // Save Prompt
-            coverResult = { imageUrl: url, prompt: visualPrompt };
+            // Save Prompt only
+            coverResult = { imageUrl: '', prompt: visualPrompt };
         } else {
              coverResult = project.coverImage || null;
         }
@@ -570,7 +573,7 @@ const ProjectWorkspace: React.FC = () => {
                     })}
                 </svg>
                 {NODES_CONFIG.map((n, i) => {
-                    const has = n.id==='input' ? !!project.title : n.id==='script' ? !!project.script : n.id==='titles' ? !!project.titles?.length : n.id==='audio_file' ? !!project.audioFile : n.id==='summary' ? !!project.summary : !!(project.coverImage?.imageUrl);
+                    const has = n.id==='input' ? !!project.title : n.id==='script' ? !!project.script : n.id==='titles' ? !!project.titles?.length : n.id==='audio_file' ? !!project.audioFile : n.id==='summary' ? !!project.summary : n.id==='cover' ? !!(project.coverImage?.prompt) : false;
                     const ts = project.moduleTimestamps?.[n.id];
                     return (
                         <div key={n.id} style={{ left: n.x, top: n.y, width: NODE_WIDTH, height: NODE_HEIGHT }} onClick={(e) => { e.stopPropagation(); setSelectedNodeId(n.id); }} className={`absolute rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden bg-white hover:shadow-md ${selectedNodeId===n.id ? 'ring-2 ring-indigo-400' : has ? 'bg-emerald-50/50 border-emerald-100' : ''}`}>
@@ -713,23 +716,44 @@ const ProjectWorkspace: React.FC = () => {
                             </div>
                             <div className="w-[220px] flex-shrink-0 flex flex-col gap-4 pt-8">
                                 {project.coverImage?.imageUrl ? (
-                                    <div className="space-y-2">
+                                    <div className="space-y-4">
                                         <div className="relative group rounded-xl overflow-hidden border border-slate-200 shadow-lg bg-slate-100">
                                             <img src={project.coverImage.imageUrl} className="w-full h-auto object-cover" alt="Cover Preview" />
-                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                                 <button 
                                                     onClick={handleDownloadCover} 
-                                                    className="bg-white text-slate-900 px-3 py-1.5 rounded-lg font-bold text-xs shadow-xl flex items-center gap-2 hover:bg-slate-100 transition-colors"
+                                                    className="bg-white text-slate-900 p-2 rounded-lg font-bold shadow-xl hover:bg-slate-100 transition-colors"
+                                                    title="下载封面"
                                                 >
-                                                    <Download className="w-3.5 h-3.5" /> 下载
+                                                    <Download className="w-4 h-4" />
+                                                </button>
+                                                <button 
+                                                    onClick={handleGenerateCoverImage} 
+                                                    className="bg-white text-slate-900 p-2 rounded-lg font-bold shadow-xl hover:bg-slate-100 transition-colors"
+                                                    title="重新生成"
+                                                >
+                                                    <RefreshCw className="w-4 h-4" />
                                                 </button>
                                             </div>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="aspect-video border-2 border-dashed border-slate-200 bg-slate-50 rounded-2xl flex flex-col items-center justify-center text-slate-400 gap-2">
-                                        <ImageIcon className="w-8 h-8 opacity-20" />
-                                        <p className="text-[10px] font-bold">暂无封面</p>
+                                    <div className="h-full flex flex-col gap-3">
+                                        <div className="aspect-video border-2 border-dashed border-slate-200 bg-slate-50 rounded-2xl flex flex-col items-center justify-center text-slate-400 gap-2">
+                                            <ImageIcon className="w-8 h-8 opacity-20" />
+                                            <p className="text-[10px] font-bold">暂无封面</p>
+                                        </div>
+                                        
+                                        {project.coverImage?.prompt && (
+                                            <button 
+                                                onClick={handleGenerateCoverImage}
+                                                disabled={generatingNodes.has('cover_image')}
+                                                className="w-full py-3 bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-fuchsia-500/20 hover:shadow-fuchsia-500/40 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                {generatingNodes.has('cover_image') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Palette className="w-4 h-4" />}
+                                                生成图片
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>
