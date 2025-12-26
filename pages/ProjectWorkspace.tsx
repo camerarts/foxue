@@ -348,8 +348,18 @@ const ProjectWorkspace: React.FC = () => {
         } else if (nodeId === 'cover') {
              // 1. Generate Prompt Description
             const visualPrompt = await gemini.generateText(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''));
-             // 2. Generate Image
-            const base64 = await gemini.generateImage(visualPrompt + " Youtube thumbnail, high quality, 4k");
+             
+             // API Key Check for Pro model
+            try {
+                const hasKey = await (window as any).aistudio?.hasSelectedApiKey();
+                if (!hasKey) {
+                    await (window as any).aistudio?.openSelectKey();
+                }
+            } catch (e) { console.warn("AI Studio key check skipped", e); }
+
+             // 2. Generate Image using Pro Model
+            const base64 = await gemini.generateImage(visualPrompt + " Youtube thumbnail, high quality, 4k", 'gemini-3-pro-image-preview');
+             
              // 3. Upload to Cloud
             const url = await storage.uploadImage(base64, project.id);
             update = { coverImage: { imageUrl: url } };
@@ -407,7 +417,16 @@ const ProjectWorkspace: React.FC = () => {
         let coverResult: { imageUrl: string } | null = null;
         if (needsCover) {
             const visualPrompt = await gemini.generateText(coverTemplate);
-            const base64 = await gemini.generateImage(visualPrompt + " Youtube thumbnail, high quality, 4k");
+            
+            // API Key Check for Pro model
+            try {
+                const hasKey = await (window as any).aistudio?.hasSelectedApiKey();
+                if (!hasKey) {
+                    await (window as any).aistudio?.openSelectKey();
+                }
+            } catch (e) { console.warn("AI Studio key check skipped", e); }
+
+            const base64 = await gemini.generateImage(visualPrompt + " Youtube thumbnail, high quality, 4k", 'gemini-3-pro-image-preview');
             const url = await storage.uploadImage(base64, project.id);
             coverResult = { imageUrl: url };
         } else {
