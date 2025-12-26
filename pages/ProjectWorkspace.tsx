@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
@@ -700,38 +701,39 @@ const ProjectWorkspace: React.FC = () => {
                  )}
                  {selectedNodeId === 'summary' && <div className="p-6 h-full overflow-y-auto"><TextResultBox title="简介标签" content={project.summary} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, summary: v })} /></div>}
                  {selectedNodeId === 'cover' && (
-                     <div className="p-6 h-full overflow-y-auto flex flex-col gap-4">
-                        <div className="flex-shrink-0">
-                            <TextResultBox
-                                title="AI 封面提示词 (PROMPT)"
-                                content={project.coverImage?.prompt || ''}
-                                readOnly={true}
-                                placeholder="生成后将在此显示用于绘图的英文提示词..."
-                            />
-                        </div>
-                        {project.coverImage?.imageUrl ? (
-                            <div className="space-y-4">
-                                <div className="relative group rounded-xl overflow-hidden border border-slate-200 shadow-lg">
-                                    <img src={project.coverImage.imageUrl} className="w-full h-auto object-cover" alt="Cover Preview" />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <button 
-                                            onClick={handleDownloadCover} 
-                                            className="bg-white text-slate-900 px-4 py-2 rounded-lg font-bold text-sm shadow-xl flex items-center gap-2 hover:bg-slate-100 transition-colors"
-                                        >
-                                            <Download className="w-4 h-4" /> 下载封面
-                                        </button>
+                     <div className="p-6 h-full overflow-hidden flex flex-col">
+                        <div className="flex flex-row gap-4 h-full">
+                            <div className="flex-1 min-w-0 h-full flex flex-col">
+                                <TextResultBox
+                                    title="AI 封面提示词 (PROMPT)"
+                                    content={project.coverImage?.prompt || ''}
+                                    readOnly={true}
+                                    placeholder="生成后将在此显示用于绘图的英文提示词..."
+                                />
+                            </div>
+                            <div className="w-[220px] flex-shrink-0 flex flex-col gap-4 pt-8">
+                                {project.coverImage?.imageUrl ? (
+                                    <div className="space-y-2">
+                                        <div className="relative group rounded-xl overflow-hidden border border-slate-200 shadow-lg bg-slate-100">
+                                            <img src={project.coverImage.imageUrl} className="w-full h-auto object-cover" alt="Cover Preview" />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <button 
+                                                    onClick={handleDownloadCover} 
+                                                    className="bg-white text-slate-900 px-3 py-1.5 rounded-lg font-bold text-xs shadow-xl flex items-center gap-2 hover:bg-slate-100 transition-colors"
+                                                >
+                                                    <Download className="w-3.5 h-3.5" /> 下载
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="aspect-video border-2 border-dashed border-slate-200 bg-slate-50 rounded-2xl flex flex-col items-center justify-center text-slate-400 gap-2">
+                                        <ImageIcon className="w-8 h-8 opacity-20" />
+                                        <p className="text-[10px] font-bold">暂无封面</p>
+                                    </div>
+                                )}
                             </div>
-                        ) : (
-                            <div className="h-64 border-2 border-dashed border-slate-200 bg-slate-50 rounded-2xl flex flex-col items-center justify-center text-slate-400 gap-3">
-                                <ImageIcon className="w-12 h-12 opacity-20" />
-                                <div className="text-center">
-                                    <p className="text-sm font-bold">暂无封面</p>
-                                    <p className="text-xs opacity-60">点击左侧“生成”按钮开始创作</p>
-                                </div>
-                            </div>
-                        )}
+                        </div>
                      </div>
                  )}
             </div>
