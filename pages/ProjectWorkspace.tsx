@@ -9,7 +9,7 @@ import {
   List, PanelRightClose, Sparkles, Loader2, Copy, 
   Check, Images, ArrowRight, Palette, Film, Maximize2, Play, Pause,
   ZoomIn, ZoomOut, Move, RefreshCw, Rocket, AlertCircle, Archive,
-  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2, Download, Music4, Clock, X, ClipboardPaste
+  Cloud, CloudCheck, ArrowLeftRight, FileAudio, Upload, Trash2, Headphones, CheckCircle2, CloudUpload, Volume2, VolumeX, Wand2, Download, Music4, Clock, X, ClipboardPaste, Image as ImageIcon
 } from 'lucide-react';
 
 const formatTimestamp = (ts?: number) => {
@@ -271,7 +271,7 @@ const NODES_CONFIG = [
   { id: 'titles', label: '爆款标题', panelTitle: '标题策划', icon: TypeIcon, color: 'amber', promptKey: 'TITLES', description: '生成高点击率标题', x: 850, y: 100 },
   { id: 'audio_file', label: '上传MP3', panelTitle: '音频文件', icon: FileAudio, color: 'fuchsia', description: '上传配音/BGM', x: 850, y: 300 },
   { id: 'summary', label: '简介标签', panelTitle: '发布元数据', icon: List, color: 'emerald', promptKey: 'SUMMARY', description: 'SEO 简介与标签', x: 850, y: 500 },
-  { id: 'cover', label: '封面策划', panelTitle: '封面方案', icon: Palette, color: 'rose', promptKey: 'COVER_GEN', description: '画面描述与文案', x: 850, y: 700 },
+  { id: 'cover', label: '封面图', panelTitle: '封面预览', icon: ImageIcon, color: 'rose', promptKey: 'COVER_GEN', description: '生成视频封面图', x: 850, y: 700 },
 ];
 const CONNECTIONS = [ { from: 'input', to: 'script' }, { from: 'script', to: 'audio_file' }, { from: 'script', to: 'titles' }, { from: 'script', to: 'summary' }, { from: 'script', to: 'cover' } ];
 
@@ -346,8 +346,13 @@ const ProjectWorkspace: React.FC = () => {
             if (!text) throw new Error("AI 返回内容为空");
             update = { summary: text.replace(/\*/g, '') };
         } else if (nodeId === 'cover') {
-            const schema = { type: "ARRAY", items: { type: "OBJECT", properties: { visual: { type: "STRING" }, titleTop: { type: "STRING" }, titleBottom: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["visual", "titleTop", "titleBottom"] } };
-            update = { coverOptions: await gemini.generateJSON(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''), schema) };
+             // 1. Generate Prompt Description
+            const visualPrompt = await gemini.generateText(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''));
+             // 2. Generate Image
+            const base64 = await gemini.generateImage(visualPrompt + " Youtube thumbnail, high quality, 4k");
+             // 3. Upload to Cloud
+            const url = await storage.uploadImage(base64, project.id);
+            update = { coverImage: { imageUrl: url } };
         }
 
         const now = Date.now();
@@ -366,7 +371,7 @@ const ProjectWorkspace: React.FC = () => {
 
     const needsTitles = !project.titles || project.titles.length === 0;
     const needsSummary = !project.summary || project.summary.trim() === '';
-    const needsCover = !project.coverOptions || project.coverOptions.length === 0;
+    const needsCover = !project.coverImage || !project.coverImage.imageUrl;
 
     const actualTargets: string[] = [];
     if (needsTitles) actualTargets.push('titles');
@@ -387,24 +392,34 @@ const ProjectWorkspace: React.FC = () => {
     try {
         const titlePrompt = prompts['TITLES'].template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || '');
         const summaryPrompt = prompts['SUMMARY'].template.replace(/\{\{script\}\}/g, project.script || '');
-        const coverPrompt = prompts['COVER_GEN'].template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || '');
+        const coverTemplate = prompts['COVER_GEN'].template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || '');
         
         const titleSchema = { type: "ARRAY", items: { type: "OBJECT", properties: { mainTitle: { type: "STRING" }, subTitle: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["mainTitle", "subTitle", "score"] } };
-        const coverSchema = { type: "ARRAY", items: { type: "OBJECT", properties: { visual: { type: "STRING" }, titleTop: { type: "STRING" }, titleBottom: { type: "STRING" }, score: { type: "NUMBER" } }, required: ["visual", "titleTop", "titleBottom"] } };
 
-        const tasks: Promise<any>[] = [];
-        if (needsTitles) tasks.push(gemini.generateJSON<TitleItem[]>(titlePrompt, titleSchema)); else tasks.push(Promise.resolve(null));
-        if (needsSummary) tasks.push(gemini.generateText(summaryPrompt).then(res => res.trim().replace(/\*/g, ''))); else tasks.push(Promise.resolve(null));
-        if (needsCover) tasks.push(gemini.generateJSON<CoverOption[]>(coverPrompt, coverSchema)); else tasks.push(Promise.resolve(null));
+        // Generate Titles and Summary (Parallel)
+        const textTasks: Promise<any>[] = [];
+        if (needsTitles) textTasks.push(gemini.generateJSON<TitleItem[]>(titlePrompt, titleSchema)); else textTasks.push(Promise.resolve(null));
+        if (needsSummary) textTasks.push(gemini.generateText(summaryPrompt).then(res => res.trim().replace(/\*/g, ''))); else textTasks.push(Promise.resolve(null));
+        
+        const [titlesResult, summaryResult] = await Promise.all(textTasks);
 
-        const [titlesResult, summaryResult, coverResult] = await Promise.all(tasks);
+        // Generate Cover Image (Sequential to avoid overload)
+        let coverResult: { imageUrl: string } | null = null;
+        if (needsCover) {
+            const visualPrompt = await gemini.generateText(coverTemplate);
+            const base64 = await gemini.generateImage(visualPrompt + " Youtube thumbnail, high quality, 4k");
+            const url = await storage.uploadImage(base64, project.id);
+            coverResult = { imageUrl: url };
+        } else {
+             coverResult = project.coverImage || null;
+        }
 
         const now = Date.now();
         const nextProject: ProjectData = {
             ...project,
             titles: needsTitles ? titlesResult : project.titles,
             summary: needsSummary ? summaryResult : project.summary,
-            coverOptions: needsCover ? coverResult : project.coverOptions,
+            coverImage: needsCover && coverResult ? coverResult : project.coverImage,
             moduleTimestamps: {
                 ...(project.moduleTimestamps || {}),
                 ...(needsTitles ? { titles: now } : {}),
@@ -468,6 +483,16 @@ const ProjectWorkspace: React.FC = () => {
           setSelectedNodeId(null);
       }
   };
+  
+  const handleDownloadCover = () => {
+      if (!project?.coverImage?.imageUrl) return;
+      const link = document.createElement("a");
+      link.href = project.coverImage.imageUrl;
+      link.download = `cover_${project.title}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  };
 
   if (loading || !project) return <div className="flex h-full items-center justify-center text-slate-400 font-bold">加载中...</div>;
 
@@ -518,7 +543,7 @@ const ProjectWorkspace: React.FC = () => {
                     })}
                 </svg>
                 {NODES_CONFIG.map((n, i) => {
-                    const has = n.id==='input' ? !!project.title : n.id==='script' ? !!project.script : n.id==='titles' ? !!project.titles?.length : n.id==='audio_file' ? !!project.audioFile : n.id==='summary' ? !!project.summary : !!project.coverOptions?.length;
+                    const has = n.id==='input' ? !!project.title : n.id==='script' ? !!project.script : n.id==='titles' ? !!project.titles?.length : n.id==='audio_file' ? !!project.audioFile : n.id==='summary' ? !!project.summary : !!(project.coverImage?.imageUrl);
                     const ts = project.moduleTimestamps?.[n.id];
                     return (
                         <div key={n.id} style={{ left: n.x, top: n.y, width: NODE_WIDTH, height: NODE_HEIGHT }} onClick={(e) => { e.stopPropagation(); setSelectedNodeId(n.id); }} className={`absolute rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col overflow-hidden bg-white hover:shadow-md ${selectedNodeId===n.id ? 'ring-2 ring-indigo-400' : has ? 'bg-emerald-50/50 border-emerald-100' : ''}`}>
@@ -649,21 +674,37 @@ const ProjectWorkspace: React.FC = () => {
                  )}
                  {selectedNodeId === 'summary' && <div className="p-6 h-full overflow-y-auto"><TextResultBox title="简介标签" content={project.summary} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, summary: v })} /></div>}
                  {selectedNodeId === 'cover' && (
-                     <div className="p-6 h-full overflow-y-auto">
-                        <div className="space-y-4">
-                            {project.coverOptions?.map((o, i) => (
-                                <div key={i} className="bg-white rounded-xl border overflow-hidden">
-                                    <div className="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
-                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">方案 {i+1}</span>
-                                        <RowCopyButton text={`${o.titleTop}\n${o.titleBottom}`} />
-                                    </div>
-                                    <div className="p-4 space-y-3">
-                                        <div className="text-lg font-black text-slate-800 leading-tight">{o.titleTop}</div>
-                                        <div className="text-sm font-bold text-slate-500">{o.titleBottom}</div>
+                     <div className="p-6 h-full overflow-y-auto flex flex-col gap-4">
+                        {project.coverImage?.imageUrl ? (
+                            <div className="space-y-4">
+                                <div className="relative group rounded-xl overflow-hidden border border-slate-200 shadow-lg">
+                                    <img src={project.coverImage.imageUrl} className="w-full h-auto object-cover" alt="Cover Preview" />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <button 
+                                            onClick={handleDownloadCover} 
+                                            className="bg-white text-slate-900 px-4 py-2 rounded-lg font-bold text-sm shadow-xl flex items-center gap-2 hover:bg-slate-100 transition-colors"
+                                        >
+                                            <Download className="w-4 h-4" /> 下载封面
+                                        </button>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                                <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex items-start gap-3">
+                                    <Sparkles className="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
+                                    <div className="text-xs text-indigo-800 leading-relaxed">
+                                        <span className="font-bold block mb-1">AI 封面提示词</span>
+                                        已自动根据脚本内容生成绘图指令并完成绘制。如需修改，请点击左侧面板的“重选”重新生成。
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="h-64 border-2 border-dashed border-slate-200 bg-slate-50 rounded-2xl flex flex-col items-center justify-center text-slate-400 gap-3">
+                                <ImageIcon className="w-12 h-12 opacity-20" />
+                                <div className="text-center">
+                                    <p className="text-sm font-bold">暂无封面</p>
+                                    <p className="text-xs opacity-60">点击左侧“生成”按钮开始创作</p>
+                                </div>
+                            </div>
+                        )}
                      </div>
                  )}
             </div>
