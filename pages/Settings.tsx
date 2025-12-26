@@ -45,7 +45,7 @@ const Settings: React.FC = () => {
     init();
   }, []);
 
-  // 监听 prompts 变动，设置页面改为 1 秒即时保存
+  // 监听 prompts 变动，改为 8 秒延迟保存
   useEffect(() => {
     if (!isInitialized.current) return;
 
@@ -64,7 +64,7 @@ const Settings: React.FC = () => {
         }
     };
 
-    const timer = setTimeout(autoSave, 1000); 
+    const timer = setTimeout(autoSave, 8000); 
     return () => clearTimeout(timer);
   }, [prompts]);
 
@@ -102,7 +102,7 @@ const Settings: React.FC = () => {
       <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-end mb-6 md:mb-10">
         <div>
           <h1 className="text-2xl md:text-4xl font-extrabold text-slate-900 mb-0.5 md:mb-2 tracking-tight">AI 提示词配置</h1>
-          <p className="text-xs md:text-base text-slate-500 font-medium">设置页面的修改将即时保存并同步至云端。</p>
+          <p className="text-xs md:text-base text-slate-500 font-medium">配置将延迟 8 秒自动保存并同步至云端。</p>
         </div>
         <div className="flex flex-col items-end gap-2">
             <div className={`flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full border bg-white shadow-sm transition-all ${
@@ -117,7 +117,7 @@ const Settings: React.FC = () => {
                  syncStatus === 'pending' ? <Clock className="w-3.5 h-3.5" /> :
                  syncStatus === 'error' ? <AlertCircle className="w-3.5 h-3.5" /> :
                  <Cloud className="w-3.5 h-3.5" />}
-                {syncStatus === 'synced' ? '已同步云端' : syncStatus === 'saving' ? '同步中...' : syncStatus === 'pending' ? '正在保存...' : syncStatus === 'error' ? '同步失败' : '就绪'}
+                {syncStatus === 'synced' ? '已同步云端' : syncStatus === 'saving' ? '同步中...' : syncStatus === 'pending' ? '变更待保存 (8s)' : syncStatus === 'error' ? '同步失败' : '就绪'}
             </div>
             <span className="text-[10px] font-bold text-slate-400 tracking-wider">
                 {refreshTime}
@@ -138,9 +138,9 @@ const Settings: React.FC = () => {
                 <AlertTriangle className="w-5 h-5" />
             </div>
             <div className="space-y-1">
-                <p className="font-bold text-indigo-900 text-sm">即时同步模式</p>
+                <p className="font-bold text-indigo-900 text-sm">自动同步机制</p>
                 <p className="text-xs text-indigo-700/80 leading-relaxed">
-                    设置页面的任何修改都会立即生效并自动上传至云端数据库。
+                    任何修改都会在停止操作 8 秒后自动保存并上传至云端数据库。
                 </p>
             </div>
         </div>
