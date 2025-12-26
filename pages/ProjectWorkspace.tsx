@@ -307,10 +307,11 @@ const ProjectWorkspace: React.FC = () => {
 
   const updateProjectAndSyncImmediately = (updated: ProjectData) => {
       setProject(updated);
-      setSyncStatus('pending');
+      setSyncStatus('pending'); // Update status to pending
       
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       
+      // 8-second debounce
       saveTimerRef.current = setTimeout(async () => {
           setSyncStatus('saving');
           try {
