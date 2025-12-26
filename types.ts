@@ -141,21 +141,17 @@ export const DEFAULT_PROMPTS: Record<string, PromptTemplate> = {
   },
   COVER_GEN: {
     id: 'cover_gen',
-    name: '封面文字策划',
-    description: '基于脚本内容生成封面方案',
-    template: `你是一名顶尖的短视频封面设计师。请基于以下内容策划 3 个高点击率的封面方案。
-    
+    name: '封面图提示词',
+    description: '生成用于AI绘图的封面视觉描述',
+    template: `你是一位专业的YouTube/B站视频封面设计师。请根据以下视频信息，创作一个极具吸引力、高点击率的封面画面描述（Prompt）。
+
 主题: {{title}}
-脚本内容: {{script}}
+脚本摘要: {{script}}
 
-**输出格式严正声明：**
-必须仅输出一个合法的 JSON 数组，严禁输出 Markdown 表格（即严禁使用 | 符号作为格式）。
-如果违反此格式，系统将无法解析。
-
-每个对象必须包含：
-- "visual": 视觉画面详细描述（主体、表情、氛围）。
-- "titleTop": 封面最上方的主标题（短小、冲击力强）。
-- "titleBottom": 封面下方的补充文案（反差、结果）。
-- "score": 推荐分数(1-100)。`
+**要求：**
+1. 画面描述必须具体、生动，包含主体（Character/Object）、背景（Background）、光影（Lighting）、色彩（Colors）和构图（Composition）。
+2. 描述风格应夸张、有冲击力（High CTR style），类似于电影海报或3D渲染图。
+3. 请直接输出一段**英文**的画面描述，不要包含任何解释性文字，也不要包含具体的标题文字（因为这是给AI绘图模型看的）。
+4. 结尾加上: "hyper-realistic, 4k, cinematic lighting, vivid colors".`
   }
 };
