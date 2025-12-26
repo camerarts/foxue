@@ -362,7 +362,8 @@ const ProjectWorkspace: React.FC = () => {
              
              // 3. Upload to Cloud
             const url = await storage.uploadImage(base64, project.id);
-            update = { coverImage: { imageUrl: url } };
+            // Save BOTH imageUrl AND prompt
+            update = { coverImage: { imageUrl: url, prompt: visualPrompt } };
         }
 
         const now = Date.now();
@@ -414,7 +415,7 @@ const ProjectWorkspace: React.FC = () => {
         const [titlesResult, summaryResult] = await Promise.all(textTasks);
 
         // Generate Cover Image (Sequential to avoid overload)
-        let coverResult: { imageUrl: string } | null = null;
+        let coverResult: { imageUrl: string; prompt?: string } | null = null;
         if (needsCover) {
             const visualPrompt = await gemini.generateText(coverTemplate);
             
@@ -428,7 +429,8 @@ const ProjectWorkspace: React.FC = () => {
 
             const base64 = await gemini.generateImage(visualPrompt + " Youtube thumbnail, high quality, 4k", 'gemini-3-pro-image-preview');
             const url = await storage.uploadImage(base64, project.id);
-            coverResult = { imageUrl: url };
+            // Save Prompt
+            coverResult = { imageUrl: url, prompt: visualPrompt };
         } else {
              coverResult = project.coverImage || null;
         }
@@ -694,6 +696,14 @@ const ProjectWorkspace: React.FC = () => {
                  {selectedNodeId === 'summary' && <div className="p-6 h-full overflow-y-auto"><TextResultBox title="简介标签" content={project.summary} onSave={(v: any) => updateProjectAndSyncImmediately({ ...project, summary: v })} /></div>}
                  {selectedNodeId === 'cover' && (
                      <div className="p-6 h-full overflow-y-auto flex flex-col gap-4">
+                        <div className="flex-shrink-0">
+                            <TextResultBox
+                                title="AI 封面提示词 (PROMPT)"
+                                content={project.coverImage?.prompt || ''}
+                                readOnly={true}
+                                placeholder="生成后将在此显示用于绘图的英文提示词..."
+                            />
+                        </div>
                         {project.coverImage?.imageUrl ? (
                             <div className="space-y-4">
                                 <div className="relative group rounded-xl overflow-hidden border border-slate-200 shadow-lg">
@@ -705,13 +715,6 @@ const ProjectWorkspace: React.FC = () => {
                                         >
                                             <Download className="w-4 h-4" /> 下载封面
                                         </button>
-                                    </div>
-                                </div>
-                                <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex items-start gap-3">
-                                    <Sparkles className="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
-                                    <div className="text-xs text-indigo-800 leading-relaxed">
-                                        <span className="font-bold block mb-1">AI 封面提示词</span>
-                                        已自动根据脚本内容生成绘图指令并完成绘制。如需修改，请点击左侧面板的“重选”重新生成。
                                     </div>
                                 </div>
                             </div>
