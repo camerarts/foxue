@@ -49,7 +49,7 @@ export interface ProjectData {
   titles?: TitleItem[];
   summary?: string;
   coverOptions?: CoverOption[];
-  coverImage?: { imageUrl: string };
+  coverImage?: { imageUrl: string; prompt?: string };
   audioFile?: string;
 }
 
