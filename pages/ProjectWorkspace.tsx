@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProjectData, TitleItem, StoryboardFrame, CoverOption, PromptTemplate, ProjectStatus } from '../types';
@@ -347,7 +346,10 @@ const ProjectWorkspace: React.FC = () => {
             update = { summary: text.replace(/\*/g, '') };
         } else if (nodeId === 'cover') {
              // 1. Generate Prompt Description
-            const visualPrompt = await gemini.generateText(template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''));
+            const visualPrompt = await gemini.generateText(
+                template.replace(/\{\{title\}\}/g, project.title).replace(/\{\{script\}\}/g, project.script || ''),
+                'gemini-2.5-flash-preview-09-2025'
+            );
              
              // API Key Check for Pro model
             try {
@@ -417,7 +419,10 @@ const ProjectWorkspace: React.FC = () => {
         // Generate Cover Image (Sequential to avoid overload)
         let coverResult: { imageUrl: string; prompt?: string } | null = null;
         if (needsCover) {
-            const visualPrompt = await gemini.generateText(coverTemplate);
+            const visualPrompt = await gemini.generateText(
+                coverTemplate,
+                'gemini-2.5-flash-preview-09-2025'
+            );
             
             // API Key Check for Pro model
             try {
